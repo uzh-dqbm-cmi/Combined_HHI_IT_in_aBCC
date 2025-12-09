@@ -1,0 +1,781 @@
+---
+title: "Spatial_figures"
+author: "Zsolt Balazs and Xiaocheng Yang"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+library(ggplot2)
+library(patchwork)
+library(dplyr)
+library(cowplot)
+library(plotly)
+library("org.Hs.eg.db", character.only = TRUE)
+library(msigdbr)
+library(fgsea)
+library(ggrepel)
+library(tibble)
+library(stringr)
+library(qs)
+library(tidyr)
+library(scales)
+library(spacexr)
+library(dsb)
+library(CellChat)
+library(infercnv)
+```
+
+```{r}
+options(future.globals.maxSize = 3.2e+12)
+R_object_folder <- "R_objects/"
+ours <- qread("R_objects/our_BCC.RData") # this is from Restivo et al. 2022
+```
+
+#CITE-seq data scaling
+```{r}
+# Isotype controls using in CITE-seq
+ic_derm <- c("mouse_IgG1k", "rat_IgG2a", "mouse_IgG2a", "mouse_IgG2bk")
+
+################# Defining custom functions ########################
+rundsb <- function(folder, mit_threshold=0.15, ic=isotype_controls){
+  raw <- Read10X(paste0(folder, "/raw_feature_bc_matrix/"))
+  cells <- Read10X(paste0(folder, "/filtered_feature_bc_matrix/"))
+  stained_cells <- colnames(cells$`Gene Expression`)
+  background <- setdiff(colnames(raw$`Gene Expression`), stained_cells)
+  prot <- raw$`Antibody Capture`
+  rna <- raw$`Gene Expression`
+  mtgene <- grep(pattern = "^MT-", rownames(rna), value = TRUE) # used below
+  md <- data.frame(
+    rna.size = log10(Matrix::colSums(rna)), 
+    prot.size = log10(Matrix::colSums(prot)), 
+    n.gene = Matrix::colSums(rna > 0), 
+    mt.prop = Matrix::colSums(rna[mtgene, ]) / Matrix::colSums(rna))
+  # add indicator for barcodes Cell Ranger called as cells
+  md$drop.class <- ifelse(rownames(md) %in% stained_cells, 'cell', 'background')
+  
+  # remove barcodes with no evidence of capture in the experiment
+  md <- md[md$rna.size > 0 & md$prot.size > 0, ]
+  
+  background_drops = rownames(
+    md[md$prot.size > 1.5 & 
+         md$prot.size < 3 & 
+         md$rna.size < 2.5, ]) 
+  background.adt.mtx = as.matrix(prot[ , background_drops])
+  # calculate statistical thresholds for droplet filtering.
+  cellmd = md[md$drop.class == 'cell', ]
+  
+  # filter drops with + / - 3 median absolute deviations from the median library size
+  rna.mult = (3*mad(cellmd$rna.size))
+  prot.mult = (3*mad(cellmd$prot.size))
+  rna.lower = median(cellmd$rna.size) - rna.mult
+  rna.upper = median(cellmd$rna.size) + rna.mult
+  prot.lower = median(cellmd$prot.size) - prot.mult
+  prot.upper = median(cellmd$prot.size) + prot.mult
+  
+  # filter rows based on droplet qualty control metrics
+  qc_cells = rownames(
+    cellmd[cellmd$prot.size > prot.lower & 
+             cellmd$prot.size < prot.upper & 
+             cellmd$rna.size > rna.lower & 
+             cellmd$rna.size < rna.upper & 
+             cellmd$mt.prop < mit_threshold, ])
+  
+  cell.adt.raw = as.matrix(prot[ , qc_cells])
+  cell.rna.raw = rna[ ,qc_cells]
+  cellmd = cellmd[qc_cells, ]
+  
+  # normalize and denoise with dsb with 
+  cells.dsb.norm = DSBNormalizeProtein(
+    cell_protein_matrix = cell.adt.raw, 
+    empty_drop_matrix = background.adt.mtx, 
+    denoise.counts = TRUE, 
+    use.isotype.control = TRUE, 
+    isotype.control.name.vec = ic)
+  return(CreateAssayObject(data = cells.dsb.norm))
+}
+```
+
+#Run different patients separately
+```{r}
+#Patient 1 is dropped because the 2nd timepoint does not have tumor (in the lesion)
+#and the 3rd timepoint is a follow-up sample (at remission) from after the treatment had ended 
+#so there is nothing to learn from this patient with relation to the combination therapy.
+
+######## Patient 2 #########
+pat2dir <- "C:/Work/BCC-aPD1-HHI/STx/Icf063_Pat2"
+
+pat2 <- Load10X_Spatial(data.dir=pat2dir, slice = "pat2")
+pat2[["CITE"]] = rundsb(pat2dir, ic=ic_derm)
+
+pat2 <- SCTransform(pat2, assay = "Spatial", verbose = FALSE)
+
+pat2 <- RunPCA(pat2, assay = "SCT", verbose = FALSE)
+pat2 <- FindNeighbors(pat2, reduction = "pca", dims = 1:20)
+pat2 <- FindClusters(pat2)
+pat2 <- RunUMAP(pat2, reduction = "pca", dims = 1:20)
+
+pat2@meta.data$ir <- GetTissueCoordinates(pat2)$imagerow
+pat2@meta.data$ic <- GetTissueCoordinates(pat2)$imagecol
+
+pat2@meta.data$time[pat2@meta.data$ir>340] <- "T1"
+pat2@meta.data$time[pat2@meta.data$ir<320 & pat2@meta.data$ir>190] <- "T2"
+pat2@meta.data$time[pat2@meta.data$ir<190] <- "T3"
+
+pat2@meta.data$patient <- "Pat2"
+pat2 <- subset(pat2, nCount_Spatial > 2500)
+
+anchors <- FindTransferAnchors(reference = ours, query = pat2, normalization.method = "SCT")
+predictions.assay <- TransferData(anchorset = anchors, refdata = ours$new_type,
+                                  prediction.assay = TRUE, weight.reduction = pat2[["pca"]],
+                                  dims = 1:20)
+pat2[["predictions"]] <- predictions.assay
+
+
+######## Patient 3a #########
+pat3adir <- "C:/Work/BCC-aPD1-HHI/STx/ptw592_Pat3-a_Plate_3394_1"
+pat3a <- Load10X_Spatial(data.dir=pat3adir, slice = "pat3a")
+pat3a[["CITE"]] = rundsb(pat3adir, ic=ic_derm)
+
+pat3a@meta.data$patient <- "Pat3a"
+pat3a <- SCTransform(pat3a, assay = "Spatial", verbose = FALSE)
+
+pat3a <- RunPCA(pat3a, assay = "SCT", verbose = FALSE)
+pat3a <- FindNeighbors(pat3a, reduction = "pca", dims = 1:20)
+pat3a <- FindClusters(pat3a)
+pat3a <- RunUMAP(pat3a, reduction = "pca", dims = 1:20)
+
+pat3a@meta.data$ir <- GetTissueCoordinates(pat3a)$imagerow
+pat3a@meta.data$ic <- GetTissueCoordinates(pat3a)$imagecol
+
+pat3a@meta.data$time[pat3a@meta.data$ir>310] <- "T1"
+pat3a@meta.data$time[pat3a@meta.data$ir<310 & pat3a@meta.data$ir>240] <- "remove"
+pat3a@meta.data$time[pat3a@meta.data$ir<240] <- "T3"
+pat3a@meta.data$time[pat3a@meta.data$ic<20] <- "remove"
+pat3a@meta.data$time[pat3a@meta.data$ic>320 & pat3a@meta.data$ir>240] <- "remove"
+
+pat3a <- subset(pat3a, time %in% c("T1", "T3") & nCount_Spatial > 2500)
+
+anchors <- FindTransferAnchors(reference = ours, query = pat3a, normalization.method = "SCT")
+predictions.assay <- TransferData(anchorset = anchors, refdata = ours$new_type,
+                                  prediction.assay = TRUE, weight.reduction = pat3a[["pca"]],
+                                  dims = 1:20)
+pat3a[["predictions"]] <- predictions.assay
+
+
+######## Patient 3b #########
+pat3bdir <- "C:/Work/BCC-aPD1-HHI/STx/ptw592_Pat3-b_Plate_3394_2"
+pat3b <- Load10X_Spatial(data.dir=pat3bdir, slice = "pat3b")
+pat3b[["CITE"]] = rundsb(pat3bdir, ic=ic_derm)
+pat3b@meta.data$patient <- "Pat3b"
+
+pat3b <- SCTransform(pat3b, assay = "Spatial", verbose = FALSE)
+#plot1 <- VlnPlot(pat3b, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
+#plot2 <- SpatialFeaturePlot(pat3b, features = "nCount_Spatial") + 
+#  theme(legend.position = "right")
+#wrap_plots(plot1, plot2)
+
+pat3b <- RunPCA(pat3b, assay = "SCT", verbose = FALSE)
+pat3b <- FindNeighbors(pat3b, reduction = "pca", dims = 1:20)
+pat3b <- FindClusters(pat3b)
+pat3b <- RunUMAP(pat3b, reduction = "pca", dims = 1:20)
+
+#p1 <- DimPlot(pat3b, reduction = "umap", label = TRUE)
+#p2 <- SpatialDimPlot(pat3b, label = TRUE, label.size = 3)
+#p1 + p2
+
+pat3b@meta.data$ir <- GetTissueCoordinates(pat3b)$imagerow
+pat3b@meta.data$ic <- GetTissueCoordinates(pat3b)$imagecol
+                                      
+pat3b@meta.data$time[pat3b@meta.data$ic>310] <- "T2a"
+pat3b@meta.data$time[pat3b@meta.data$ic<310] <- "T2b"
+pat3b@meta.data$time[pat3b@meta.data$ic<150 & pat3b@meta.data$ir<160] <- "remove"
+
+pat3b@meta.data$time[pat3b@meta.data$ic>490 & pat3b@meta.data$ir>360] <- "remove"
+#pat3b@meta.data$time[pat3b@meta.data$nCount_Spatial<3001] <- "remove"
+
+#p1 <- DimPlot(pat3b, reduction = "umap", group.by = "time", label = TRUE)
+#p2 <- SpatialDimPlot(pat3b, label = TRUE, group.by = "time", label.size = 3)
+#p1 + p2
+pat3b <- subset(pat3b, time %in% c("T2a", "T2b") & nCount_Spatial > 2500)
+
+anchors <- FindTransferAnchors(reference = ours, query = pat3b, normalization.method = "SCT")
+predictions.assay <- TransferData(anchorset = anchors, refdata = ours$new_type,
+                                  prediction.assay = TRUE, weight.reduction = pat3b[["pca"]],
+                                  dims = 1:20)
+pat3b[["predictions"]] <- predictions.assay
+
+```
+
+# CNV analysis - Supplementary Figure 4b
+```{r}
+#Patient2
+counts_matrix <- as.matrix(pat2[["SCT"]]$counts[,colnames(pat2)])
+
+annotation <- as.matrix(data.frame(V1=rownames(pat2@meta.data),
+                                   V2=pat2@meta.data$seurat_clusters))
+write.table(annotation, file="infercnv/annotations.tsv", 
+            quote=F, sep="\t", row.names = F)
+infercnv_obj = CreateInfercnvObject(raw_counts_matrix = counts_matrix,
+                                    annotations_file="infercnv/annotations.tsv",
+                                    delim="\t",
+                                    gene_order_file="hg38_gencode_v27.txt", # this needs to be downloaded
+                                    ref_group_names=c("5"))
+
+
+infercnv_obj = infercnv::run(infercnv_obj,
+                             cutoff=0.1, # cutoff=1 works well for Smart-seq2, and cutoff=0.1 works well for 10x Genomics
+                             out_dir="infercnv/", 
+                             cluster_by_groups=TRUE, 
+                             denoise=TRUE,
+                             HMM=TRUE)
+
+### Again with different samples separately:
+counts_matrix <- as.matrix(pat2.int[["SCT"]]$counts[,colnames(pat2.int)])
+annotation <- as.matrix(data.frame(V1=rownames(pat2.int@meta.data),
+                                   V2=pat2.int@meta.data$domsamp))
+write.table(annotation, file="infercnv_pat2ds/annotations.tsv", 
+            quote=F, sep="\t", row.names = F)
+infercnv_obj = CreateInfercnvObject(raw_counts_matrix = counts_matrix,
+                                    annotations_file="infercnv_pat2ds/annotations.tsv",
+                                    delim="\t",
+                                    gene_order_file="hg38_gencode_v27.txt",
+                                    ref_group_names=c("T1_Epidermis", "T2_Epidermis", "T3_Epidermis",
+                                                      "T1_Immune", "T2_Immune", "T3_Immune"))
+
+infercnv_obj = infercnv::run(infercnv_obj,
+                             cutoff=0.1, # cutoff=1 works well for Smart-seq2, and cutoff=0.1 works well for 10x Genomics
+                             out_dir="C:/Work/BCC-aPD1-HHI/infercnv_pat2ds/", 
+                             cluster_by_groups=TRUE, 
+                             denoise=TRUE,
+                             HMM=TRUE)
+```
+
+# Integrate and cluster patient2 samples
+```{r}
+pat2.list <- SplitObject(pat2, split.by = "time")
+
+pat2.list <- lapply(X = pat2.list, FUN = function(x) {
+  x <- SCTransform(x, assay = "Spatial")
+})
+features <- SelectIntegrationFeatures(object.list = pat2.list, nfeatures = 500)
+
+pat2.list <- PrepSCTIntegration(pat2.list, anchor.features = 500)
+
+int.anchors <- FindIntegrationAnchors(object.list = pat2.list, normalization.method = "SCT",
+                                      verbose = FALSE, anchor.features = features, 
+                                      k.filter = 50, dims = 1:20)
+pat2.int <- IntegrateData(anchorset = int.anchors, normalization.method = "SCT",
+                         verbose = FALSE, k.weight = 50, dims = 1:20)
+
+pat2.int[["Spatial"]] <- JoinLayers(pat2.int[["Spatial"]])
+
+pat2.int <- ScaleData(pat2.int)
+pat2.int <- RunPCA(pat2.int, verbose = FALSE)
+ElbowPlot(pat2.int, ndims = 50)
+pat2.int <- FindNeighbors(pat2.int, dims = 1:12)
+pat2.int <- FindClusters(pat2.int, resolution = 0.3, verbose = FALSE)
+pat2.int <- RunUMAP(pat2.int, dims = 1:12)
+
+pat2.int@images$pat2@spot.radius <- 0.03
+pat2.int@images$pat2.2@spot.radius <- 0.03
+pat2.int@images$pat2.3@spot.radius <- 0.03
+
+pat2.int@images$P2_BL = pat2.int@images$pat2.2
+pat2.int@images$P2_2wHHI = pat2.int@images$pat2
+pat2.int@images$P2_2wCemi = pat2.int@images$pat2.3
+
+pat2.int@images$P2_BL@spot.radius <- 10
+pat2.int@images$P2_2wHHI@spot.radius <- 10
+pat2.int@images$P2_2wCemi@spot.radius <- 10
+
+pat2.int@images <- pat2.int@images[c("P2_BL", "P2_2wHHI", 
+                                   "P2_2wCemi")]
+
+pat2.int@meta.data$barcode <- rownames(pat2.int@meta.data)
+
+pat2.int@meta.data$domain
+pat2.int@meta.data$domain[pat2.int@meta.data$seurat_clusters == 0] <- "Stroma1"
+pat2.int@meta.data$domain[pat2.int@meta.data$seurat_clusters == 1] <- "Tumor"
+pat2.int@meta.data$domain[pat2.int@meta.data$seurat_clusters == 2] <- "Epidermis"
+pat2.int@meta.data$domain[pat2.int@meta.data$seurat_clusters == 3] <- "Stroma2"
+pat2.int@meta.data$domain[pat2.int@meta.data$seurat_clusters == 4] <- "Immune"
+pat2.int@meta.data$domain[pat2.int@meta.data$seurat_clusters == 5] <- "Stroma2"
+```
+
+#Figure 4d and e
+```{r}
+Idents(pat2.int) <- "domain"
+typecols = c("#001CED","#66CCEE", "#E31A1C", "#FFDD00", "#CAB2D6")
+ntypecols <- typecols
+names(ntypecols) <- c("Stroma1", "Stroma2", "Tumor", "Immune", "Epidermis")
+DimPlot(pat2.int, label = T)
+(DimPlot(pat2.int, label = T, cols = ntypecols) + SpatialDimPlot(pat2.int, ncol=1, cols = ntypecols))
+
+
+pat2.int@meta.data$domsamp <- paste(pat2.int@meta.data$time, "_", 
+                                   pat2.int@meta.data$domain, sep = "")
+Idents(pat2.int) <- "domain"
+```
+
+## RCTD for Pat2 ##
+```{r}
+# set up query with the RCTD function SpatialRNA
+counts <- pat2.int[["Spatial"]]$counts
+coords <- GetTissueCoordinates(pat2.int@images$P2_BL)
+colnames(coords) <- c("x", "y")
+coords[is.na(colnames(coords))] <- NULL
+qP2BL <- SpatialRNA(coords, counts, nUMI = colSums(counts))
+
+counts <- pat2.int[["Spatial"]]$counts
+coords <- GetTissueCoordinates(pat2.int@images$P2_2wHHI)
+colnames(coords) <- c("x", "y")
+coords[is.na(colnames(coords))] <- NULL
+qP2T2 <- SpatialRNA(coords, counts, nUMI = colSums(counts))
+
+counts <- pat2.int[["Spatial"]]$counts
+coords <- GetTissueCoordinates(pat2.int@images$P2_2wCemi)
+colnames(coords) <- c("x", "y")
+coords[is.na(colnames(coords))] <- NULL
+qP2T3 <- SpatialRNA(coords, counts, nUMI = colSums(counts))
+
+RCTDP2BL <- create.RCTD(qP2BL, reference, max_cores = 16)
+RCTDP2BL <- run.RCTD(RCTDP2BL, doublet_mode = "multi")
+
+RCTDP2T2 <- create.RCTD(qP2T2, reference, max_cores = 16)
+RCTDP2T2 <- run.RCTD(RCTDP2T2, doublet_mode = "multi")
+
+RCTDP2T3 <- create.RCTD(qP2T3, reference, max_cores = 16)
+RCTDP2T3 <- run.RCTD(RCTDP2T3, doublet_mode = "multi")
+
+cell_types <- RCTDP2BL@reference@cell_types
+
+create_res_dataframe <- function(RCTDmulti){
+  res <- data.frame(matrix(0, nrow = length(RCTDmulti@results), ncol = length(cell_types)))
+  colnames(res) <- cell_types
+  
+  for (i in 1:length(RCTDmulti@results)) {
+    # sub_weights (proportions of cell types on multi-mode)
+    subweights <- RCTDmulti@results[[i]]$sub_weights
+    for (cell_type in names(subweights)) {
+      if (cell_type %in% colnames(res)) {
+        res[i, cell_type] <- subweights[cell_type]
+      }
+    }
+  }
+  return(res)
+}
+
+all_res <- list()
+rctdlist <- list("P2T1"=RCTDP2BL, "P2T2"=RCTDP2T2,
+                 "P2T3"=RCTDP2T3)
+for (j in seq_along(rctdlist)){
+  RCTDmulti <- rctdlist[[j]]
+  res <- create_res_dataframe(RCTDmulti)
+  all_res[[names(rctdlist)[j]]] <- res
+}
+
+pat2.int@meta.data$barcode <- rownames(pat2.int@meta.data)
+all_cellID <- list()
+for (k in c("P2T1","P2T2","P2T3")){
+  cellID <- pat2.int@meta.data$barcode[pat2.int@meta.data$sample==k]
+  all_cellID[[k]] <- cellID
+}
+
+all_clust <- list()
+for (k in  c("P2T1","P2T2","P2T3")){
+  clust <- pat2.int@meta.data$seurat_clusters[pat2.int@meta.data$sample==k]
+  all_clust[[k]] <- clust
+}
+
+# final_res is the result of multi mode
+final_res <- do.call(rbind, all_res)
+final_res <- final_res[, colSums(final_res != 0) > 0]
+final_clust <- unlist(all_clust, use.names = FALSE)
+final_cID <- unlist(all_cellID, use.names = FALSE)
+final_res$cluster <- final_clust
+final_res$cellID <- final_cID
+final_res <- merge(final_res, as.data.frame(pat2.int@meta.data$sample,
+                                            row.names = rownames(pat2.int@meta.data)),
+                   by.x = "cellID", by.y=0)
+final_res$sample <- final_res$`pat2.int@meta.data$sample`
+final_res <- subset(final_res, select = -c(`pat2.int@meta.data$sample`))
+rownames(final_res) <- final_res$cellID
+
+pat2.int[["ct_composition_RCTD"]] <- CreateAssayObject(
+  data=as.sparse(t(subset(final_res, select = -c(cluster, sample, cellID)))))
+# remember this the multi mode
+```
+
+# Suppl. Figure 4a
+```{r}
+res <- merge(t(as.data.frame(pat2.int[["ct_composition_RCTD"]]$data)), 
+             pat2.int@meta.data[,c("domain", "sample")], by = 0)
+rownames(res) <- res$Row.names
+res <- res[,-1]
+long_res <- res %>%
+  pivot_longer(cols = -c(domain, sample),
+    names_to = "cell_type",
+    values_to = "ratio")
+long_res$cell_type[long_res$cell_type == "Keratinocytes" |
+                     grepl("BCC", long_res$cell_type)] <- "Keratinocytes"
+
+myColors = c("#E31A1C", "#FB9A99", "#FDBF6F", "#FF7F00", "#FFFF00",
+             "#001CED", "#B2DF8A", "#46FF3E", "#838383", "#CAB2D6",
+             "#A6CEE3", "#33A02C", "#B15928", "#DEF5B0")
+## multi mode plot
+ggplot() + 
+  geom_bar(data = long_res, 
+           aes(x = domain, y = ratio, fill = cell_type),
+           position = "fill", stat="identity") +  
+  theme_classic() + 
+  scale_y_continuous(labels=percent) +
+  scale_fill_manual(name = "Cell type" ,values = myColors) + 
+  xlab("domain") + 
+  ylab("percentage") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5,
+                                   hjust=1)) +
+  facet_wrap(.~sample)
+
+ggplot() + 
+  geom_bar(data = long_res, 
+           aes(x = sample, y = ratio, fill = cell_type),
+           position = "fill", stat="identity") +  
+  theme_classic() + 
+  scale_y_continuous(labels=percent) +
+  scale_fill_manual(name = "Cell type" ,values = myColors) + 
+  xlab("sample") + 
+  ylab("Percentage") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5,
+                                   hjust=1)) +
+  facet_wrap(.~domain)
+```
+
+#Figure 4g
+```{r}
+pat2tumor <- subset(pat2.int, domain == "Tumor")
+pat2tumor@meta.data$time <- factor(pat2tumor@meta.data$time,
+                                   levels=c("T1", "T2", "T3"))
+
+Idents(pat2tumor) <- "time"
+VlnPlot(pat2tumor, features = c("TAP1", "B2M", "CANX", "CALR"), ncol = 4, pt.size = 0)
+```
+
+#Figure 4h
+```{r}
+
+pat2imm <- subset(pat2.int, domain == "Immune")
+pat2imm@meta.data$time <-factor(pat2imm@meta.data$time, levels=c("T1", "T2",
+                                                                     "T3"))
+Idents(pat2imm) <- "time"
+
+VlnPlot(pat2imm, features = c("CXCL9", "CXCL10", "CXCL11", "STAT1"),
+        ncol = 2, pt.size = 0)
+```
+
+#Figure 4f
+```{r}
+###################### Calculating average distances ################
+images <- c("P2T1", "P2T2", "P2T3")
+
+
+calculate_avg_distance <- function(seurat_obj, image_name, cluster1, cluster2) {
+
+  meta <- image_subset@meta.data
+  coords <- GetTissueCoordinates(image_subset)
+
+  meta_coords <- meta %>%
+    select(cell = rownames(.), seurat_clusters) %>%
+    left_join(as.data.frame(coords), by = "cell")
+  cluster1_cells <- meta_coords %>% filter(seurat_clusters == cluster1)
+  cluster2_cells <- meta_coords %>% filter(seurat_clusters == cluster2)
+  dists <- as.matrix(dist(rbind(cluster1_cells[, c("imagerow", "imagecol")],
+                                cluster2_cells[, c("imagerow", "imagecol")])))
+  
+  n1 <- nrow(cluster1_cells)
+  n2 <- nrow(cluster2_cells)
+  inter_cluster_dists <- dists[1:n1, (n1+1):(n1+n2)]
+  mean(inter_cluster_dists)
+}
+
+avg_dists <- map_dbl(images, ~calculate_avg_distance(pat2.int, .x, cluster1 = 4, cluster2 = 1))
+
+image_subset <- subset(pat2.int, subset = sample == "P2T1")
+image_subset <- subset(pat2.int, subset = sample == "P2T2")
+image_subset <- subset(pat2.int, subset = sample == "P2T3")
+
+cluster1_cells <- image_subset@meta.data %>% filter(seurat_clusters == 1)
+cluster2_cells <- image_subset@meta.data %>% filter(seurat_clusters == 4)
+dists <- as.matrix(dist(rbind(cluster1_cells[, c("ir", "ic")],
+                              cluster2_cells[, c("ir", "ic")])))
+n1 <- nrow(cluster1_cells)
+n2 <- nrow(cluster2_cells)
+inter_cluster_dists <- dists[1:n1, (n1+1):(n1+n2)]
+P2T1_dists <- as.vector(inter_cluster_dists)
+P2T2_dists <- as.vector(inter_cluster_dists)
+P2T3_dists <- as.vector(inter_cluster_dists)
+
+df <- bind_rows(
+  data.frame(value = P2T1_dists, group = "W0"),
+  data.frame(value = P2T2_dists, group = "W2"),
+  data.frame(value = P2T3_dists, group = "W4")
+)
+
+ggplot(df, aes(x = group, y = value, fill = group)) +
+  geom_boxplot() +
+  theme_minimal() +
+  labs(x = "Group", y = "Tumor-immune distance", 
+       title = "P2 - Tumor-immune infiltrate distance") + stat_pvalue_manual(pwc)
+
+pwc <- df %>%
+  pairwise_t_test(
+    value ~ group,
+    p.adjust.method = "bonferroni")
+pwc
+
+ggplot(df) +
+  geom_boxplot(aes(x = group, y = value, fill = group)) +
+  theme_minimal() +
+  labs(x = "Visit", y = "Tumor-immune distance", 
+       #title = "icf063 - Tumor-immune infiltrate distance"
+       ) + 
+  stat_pvalue_manual(pwc, label = "p.adj.signif", y.position = 150, 
+                     step.increase = 0.05)
+```
+
+# Suppl. Figure 4c
+```{r}
+DefaultAssay(pat2.int) <- "SCT"
+SpatialDimPlot(pat2.int, group.by = "domain", cols = ntypecols, 
+               pt.size.factor = 5)+NoLegend()
+SpatialFeaturePlot(pat2.int, "EPCAM", pt.size.factor = 5)
+SpatialFeaturePlot(pat2.int, "GLI1", pt.size.factor = 5)
+SpatialFeaturePlot(pat2.int, "LGR5", pt.size.factor = 5)
+```
+
+#Integrating the samples of Patient 3
+```{r}
+offslide <- c("AACTGCTACCTCGATA-1", "CTTAGTCTTATTCGGA-1", "GTGCCGTCCTGTCAGC-1", "TATGTTGGTAGGTCGT-1", "TCAATTAATAGAACCT-1", "TCCTACAAGCTCGAAC-1", "AGCCTCGCATGGTCCT-1", "ATGTCGTTACCAGACG-1", "ATTGACGCCAGCCAAG-1", "GCTTCTCCAGAACCGC-1", "GTGGCGCCACTACGCT-1", "TACGGTAGTTGCGTGA-1", "CTTCGACCAAGCCGAG-1", "TATTCGACAACCGTGA-1", "CGCACGTAGCATTGTT-1",             "GTGGCGCCAGCTAACC-1", "TGACTCCAAGTCTACC-1", "TGCAGAGGTCGTAATT-1", "TAGACAGGAGATCATT-1", "CTGTGGTAAGCTAATA-1", "GGTGCAATCAGACTTC-1", "ACAACTGTCGTGGATA-1", "TAGTTGGCTTAGGCCT-1", "TAGTGGTTGAACCAAT-1", "TAGCTAGAGCACGCCG-1", "CATTGGCGGTTGAGTC-1", "AAGCAGTGAGTGCGAC-1", "AAGCCATCCGTGCTAT-1", "ACCTAATTGTCGCTGA-1", "ACGCGGAAGAGTTCCG-1",
+"AGTCACTTATTCAAGG-1", "CCAGATTGTAGCCTAC-1", "CCGCTCGCTAGTCTAA-1", "CTCGGAATTCTTGATA-1", "GGACGTCGAACGGCTT-1", "GTCGGCCGTTGTGAAT-1", "GTTCGTAGGTAGTGAA-1", "TCGGTGATCGCCGGCC-1", "AACCTAAGATACTGAG-1", "ACAACTAAGTGGCGCT-1", "ACAGAATAAGAACCAT-1", "CCGGAGACAAGAATAA-1", "GCGAATGCAGTGTCAA-1", "TGGCCACTCCGCGGAC-1", "TGTCAAGCGGATCGGT-1", "ATAAGAATCATGCATC-1", "ATCCGAGTCACTTGTA-1", "ATTAGCGAGCATGCTG-1", "CGCTATTAATCTATAA-1", "CTAGCAACCAGTGCGG-1", "CTGACTGATTAGGCTG-1", "GGACGTCGAGGATTCA-1", "TCCATCGGCTAGACGA-1", "ACGAGGACCTGCTAGT-1", "AGGATCCGTGAGGCGG-1", "CCTCGGAAGGCATGCA-1", "CGACGCCGCAAGTAGC-1", "CGAGCGTAATGGAGTG-1", "TACACCTTGCGGCAGG-1")
+pat3a@meta.data$time[rownames(pat3a@meta.data) %in% offslide] <- "remove"
+pat3a <- subset(pat3a, time %in% c("T1", "T3"))
+
+offslide <- c("TGTAATCGAGACTGGC-1", "GGCCAAGATGGATGGC-1", "TACGGAACAGACGCGG-1",
+              "CCTTAGCGTTCGCAGG-1")
+pat3b@meta.data$time[rownames(pat3b@meta.data) %in% offslide] <- "remove"
+pat3b <- subset(pat3b, time %in% c("T2a", "T2b"))
+
+pat3.merge <- merge(pat3a,pat3b)
+# save the counts.Antibody Capture
+antibody_counts.1 <- LayerData(pat3.merge, layer = 'counts.Antibody Capture.1', assay = 'Spatial')
+# rm counts.Antibody Capture tmply
+LayerData(pat3.merge, layer = 'counts.Antibody Capture.1', assay = 'Spatial') <- NULL
+# save the counts.Antibody Capture
+antibody_counts.2 <- LayerData(pat3.merge, layer = 'counts.Antibody Capture.2', assay = 'Spatial')
+# rm counts.Antibody Capture tmply
+LayerData(pat3.merge, layer = 'counts.Antibody Capture.2', assay = 'Spatial') <- NULL
+
+pat.list <- SplitObject(pat3.merge, split.by = "time")
+
+pat.list <- lapply(X = pat.list, FUN = function(x) {
+    x <- NormalizeData(x)
+    x <- FindVariableFeatures(x, selection.method = "vst", nfeatures = 150)
+})
+
+features <- SelectIntegrationFeatures(object.list = pat.list)
+pat.list <- lapply(X = pat.list, FUN = function(x) {
+    x <- ScaleData(x, features = features, verbose = FALSE)
+    x <- RunPCA(x, features = features, verbose = FALSE)
+})
+
+pat.anchors <- FindIntegrationAnchors(object.list = pat.list, 
+                                      anchor.features = features, 
+                                      reduction = "rpca")
+
+# this command creates an 'integrated' data assay
+pat3.int <- IntegrateData(anchorset = pat.anchors)
+
+pat3.int@meta.data$sample <- "P3"
+pat3.int@meta.data$sample <- paste0(pat3.int@meta.data$patient, pat3.int@meta.data$time)
+DefaultAssay(pat3.int) <- "integrated"
+pat3.int[["Spatial"]] <- JoinLayers(pat3.int[["Spatial"]])
+
+image_p3t1 <- pat.list$T1@images$pat3a
+image_p3t2a <- pat.list$T2a@images$pat3b
+image_p3t2b <- pat.list$T2b@images$pat3b
+image_p3t3 <- pat.list$T3@images$pat3a
+
+## change the key
+image_p3t1@key <- 'P3_BL_'
+image_p3t2a@key <- 'P3_2wHHI_a'
+image_p3t2b@key <- 'P3_2wHHI_b'
+image_p3t3@key <- 'P3_2wCemi_'
+
+pat3.int@images <- list()
+
+pat3.int@images$P3_BL <- image_p3t1
+pat3.int@images$P3_2wHHIa <- image_p3t2a
+pat3.int@images$P3_2wHHIb <- image_p3t2b
+pat3.int@images$P3_2wCemi <- image_p3t3
+
+pat3.int <- ScaleData(pat3.int)
+pat3.int <- RunPCA(pat3.int, assay = "integrated", verbose = FALSE)
+pat3.int <- FindNeighbors(pat3.int, reduction = "pca", dims = 1:15)
+pat3.int <- FindClusters(pat3.int, resolution = 0.15)
+pat3.int <- RunUMAP(pat3.int, reduction = "pca", dims = 1:15)
+
+```
+
+# Suppl. Figure 5d and e
+```{r}
+SpatialDimPlot(pat3.int)
+DimPlot(pat3.int)
+```
+
+#RCTD for Pat3
+```{r}
+counts <- pat3.int[["Spatial"]]$counts
+coords <- GetTissueCoordinates(pat3.int@images$P3_BL)
+colnames(coords) <- c("x", "y")
+coords[is.na(colnames(coords))] <- NULL
+qP3BL <- SpatialRNA(coords, counts, nUMI = colSums(counts))
+
+counts <- pat3.int[["Spatial"]]$counts
+coords <- GetTissueCoordinates(pat3.int@images$P3_2wHHIa)
+colnames(coords) <- c("x", "y")
+coords[is.na(colnames(coords))] <- NULL
+qP3T2a <- SpatialRNA(coords, counts, nUMI = colSums(counts))
+
+counts <- pat3.int[["Spatial"]]$counts
+coords <- GetTissueCoordinates(pat3.int@images$P3_2wHHIb)
+colnames(coords) <- c("x", "y")
+coords[is.na(colnames(coords))] <- NULL
+qP3T2b <- SpatialRNA(coords, counts, nUMI = colSums(counts))
+
+counts <- pat3.int[["Spatial"]]$counts
+coords <- GetTissueCoordinates(pat3.int@images$P3_2wCemi)
+colnames(coords) <- c("x", "y")
+coords[is.na(colnames(coords))] <- NULL
+qP3T3 <- SpatialRNA(coords, counts, nUMI = colSums(counts))
+
+RCTDP3BL <- create.RCTD(qP3BL, reference, max_cores = 16)
+RCTDP3BL <- run.RCTD(RCTDP3BL, doublet_mode = "multi")
+
+RCTDP3T2a <- create.RCTD(qP3T2a, reference, max_cores = 16)
+RCTDP3T2a <- run.RCTD(RCTDP3T2a, doublet_mode = "multi")
+
+RCTDP3T2b <- create.RCTD(qP3T2b, reference, max_cores = 16)
+RCTDP3T2b <- run.RCTD(RCTDP3T2b, doublet_mode = "multi")
+
+RCTDP3T3 <- create.RCTD(qP3T3, reference, max_cores = 16)
+RCTDP3T3 <- run.RCTD(RCTDP3T3, doublet_mode = "multi")
+
+cell_types <- RCTDP3BL@reference@cell_types
+
+create_res_dataframe <- function(RCTDmulti){
+  res <- data.frame(matrix(0, nrow = length(RCTDmulti@results), ncol = length(cell_types)))
+  colnames(res) <- cell_types
+  
+  for (i in 1:length(RCTDmulti@results)) {
+    # sub_weights (proportions of cell types on multi-mode)
+    subweights <- RCTDmulti@results[[i]]$sub_weights
+    for (cell_type in names(subweights)) {
+      if (cell_type %in% colnames(res)) {
+        res[i, cell_type] <- subweights[cell_type]
+      }
+    }
+  }
+  return(res)
+}
+
+all_res <- list()
+rctdlist <- list("P3T1"=RCTDP3BL, "P3T2a"=RCTDP3T2a, "P3T2b"=RCTDP3T2b,
+                 "P3T3"=RCTDP3T3)
+for (j in seq_along(rctdlist)){
+  RCTDmulti <- rctdlist[[j]]
+  res <- create_res_dataframe(RCTDmulti)
+  all_res[[names(rctdlist)[j]]] <- res
+}
+
+pat3.int@meta.data$barcode <- rownames(pat3.int@meta.data)
+all_cellID <- list()
+for (k in c("P3T1","P3T2a","P3T2b","P3T3")){
+  cellID <- pat3.int@meta.data$barcode[pat3.int@meta.data$sample==k]
+  all_cellID[[k]] <- cellID
+}
+
+all_clust <- list()
+for (k in  c("P3T1","P3T2a","P3T2b","P3T3")){
+  clust <- pat3.int@meta.data$seurat_clusters[pat3.int@meta.data$sample==k]
+  all_clust[[k]] <- clust
+}
+# final_res is the result of multi mode
+final_res <- do.call(rbind, all_res)
+final_res <- final_res[, colSums(final_res != 0) > 0]
+final_clust <- unlist(all_clust, use.names = FALSE)
+final_cID <- unlist(all_cellID, use.names = FALSE)
+final_res$cluster <- final_clust
+final_res$cellID <- final_cID
+final_res <- merge(final_res, as.data.frame(pat3.int@meta.data$sample, row.names = rownames(pat3.int@meta.data)), by.x = "cellID", by.y=0)
+final_res$sample <- final_res$`pat3.int@meta.data$sample`
+final_res <- subset(final_res, select = -c(`pat3.int@meta.data$sample`))
+rownames(final_res) <- final_res$cellID
+pat3.int[["ct_composition_RCTD"]] <- CreateAssayObject(
+  data=as.sparse(t(subset(final_res, select = -c(cluster, sample, cellID)))))
+```
+
+# Suppl. Figure 5f
+```{r}
+res <- merge(t(as.data.frame(pat3.int[["ct_composition_RCTD"]]$data)), 
+             pat3.int@meta.data[,c("seurat_clusters", "sample")], by = 0)
+rownames(res) <- res$Row.names
+res <- res[,-1]
+
+long_res <- res %>%
+  pivot_longer(cols = -c(seurat_clusters, sample),
+    names_to = "cell_type",
+    values_to = "ratio")
+long_res$cell_type[long_res$cell_type == "Keratinocytes" |
+                     grepl("BCC", long_res$cell_type)] <- "Keratinocytes"
+
+
+myColors = c("#E31A1C", "#FB9A99", "#FDBF6F", "#FF7F00", "#FFFF00",
+             "#001CED", "#B2DF8A", "#CAB2D6",
+             "#A6CEE3", "#33A02C", "#B15928", "#DEF5B0")
+## multi mode plot
+ggplot() + 
+  geom_bar(data = long_res, 
+           aes(x = seurat_clusters, y = ratio, fill = cell_type),
+           position = "fill", stat="identity") +  
+  theme_classic() + 
+  scale_y_continuous(labels=percent) +
+  scale_fill_manual(name = "Cell type" ,values = myColors) + 
+  xlab("cluster") + 
+  ylab("percentage") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5,
+                                   hjust=1)) +
+  facet_wrap(.~sample)
+
+ggplot() + 
+  geom_bar(data = long_res, 
+           aes(x = sample, y = ratio, fill = cell_type),
+           position = "fill", stat="identity") +  
+  theme_classic() + 
+  scale_y_continuous(labels=percent) +
+  scale_fill_manual(name = "Cell type" ,values = myColors) + 
+  xlab("sample") + 
+  ylab("percentage") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5,
+                                   hjust=1)) +
+  facet_wrap(.~seurat_clusters)
+```
+
+# Suppl. Figure 5g and h
+```{r}
+Idents(pat3.int) <- "time"
+DefaultAssay(pat3.int) <- "SCT"
+VlnPlot(pat3.int, features = c("TAP1", "B2M", "CANX", "CALR"), 
+        ncol = 5, pt.size = 0)
+VlnPlot(pat3.int, features = c("CXCL9", "CXCL10", "CXCL11", "STAT1"), 
+        ncol = 4, pt.size = 0)
+```

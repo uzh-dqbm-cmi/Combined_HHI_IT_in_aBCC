@@ -1,0 +1,851 @@
+---
+title: "PBMC_figures"
+author: "Zsolt Balazs and Xiaocheng Yang"
+output: html_document
+---
+
+```{r}
+library(Seurat)
+```
+
+```{r}
+v2_48 <- readRDS("first_run_processed_matrix")
+v3_24 <- readRDS("second_run_processed_matrix.rds")
+```
+
+```{r}
+v2_48$platform <- "V2"
+v3_24$platform <- "V3"
+```
+
+```{r}
+PBMC <- merge(v2_48, v3_24)
+```
+
+```{r}
+VlnPlot(PBMC, features = 'percent.mt',group.by = 'samples')
+```
+
+```{r}
+VlnPlot(PBMC, features = 'nFeature_RNA', group.by = 'samples')
+```
+
+```{r}
+VlnPlot(PBMC, features = 'nCount_RNA', group.by = 'samples')
+```
+
+```{r}
+library(patchwork)
+plot1 <- FeatureScatter(PBMC, feature1 = "nCount_RNA", feature2 = "percent.mt",  group.by = 'samples')
+plot2 <- FeatureScatter(PBMC, feature1 = "nCount_RNA", feature2 ="nFeature_RNA",  group.by = 'samples')
+plot1 + plot2
+```
+
+```{r}
+PBMC <- subset(PBMC, subset = nFeature_RNA > 500 & nFeature_RNA < 4000 & percent.mt < 30 & nCount_RNA < 8000 & nCount_RNA > 500 )
+```
+
+```{r}
+library(future)
+options(future.globals.maxSize = 20 * 1024^3)  # set to 20GB
+PBMC <- SCTransform(PBMC, assay = "RNA", verbose = T)
+
+plan(multisession, workers = 6)
+PBMC <- RunPCA(PBMC, npcs = 30)
+
+PBMC <- RunUMAP(PBMC, dims = 1:30)
+DimPlot(PBMC, reduction = "umap", group.by = "samples", pt.size=0.6)
+DimPlot(PBMC, reduction = "umap", group.by = "platform", pt.size=0.6)
+```
+
+For some reason loading the package Azimuth causes errors when running Harmony,
+also harmony overwrites the expression matrix
+run Harmony
+
+<!-- ```{r} -->
+<!-- library(harmony) -->
+<!-- set.seed(33) -->
+<!-- PBMC <- RunHarmony(PBMC,group.by.vars = "platform", reduction.use = 'pca',  plot_convergence = TRUE) -->
+<!-- PBMC <- RunUMAP(PBMC, reduction = "harmony", dims = 1:30) -->
+<!-- DimPlot(PBMC, reduction = "umap", group.by =  "platform", pt.size=0.5) -->
+<!-- plan("default", .init = FALSE) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- DimPlot(PBMC, reduction = "umap", group.by = "samples") -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- DimPlot(v3_24, reduction = "umap", group.by = "samples") -->
+<!-- ``` -->
+
+# Integrated by seurat, to have changed expression matrix
+
+```{r}
+v2_48$platform <- "V2"
+v3_24$platform <- "V3"
+```
+
+```{r}
+PBMC_seurat <- merge(v2_48, v3_24)
+```
+## eliminate Tebe and merge P1,2,3,4
+```{r}
+cells_to_keep <- rownames(PBMC_seurat@meta.data)[!grepl("Tebe", PBMC_seurat@meta.data$samples)]
+PBMC_seurat <- subset(PBMC_seurat, cells = cells_to_keep)
+```
+
+```{r}
+PBMC_seurat@meta.data$samples <- gsub("(_1|_2)$", "", PBMC_seurat@meta.data$samples)
+```
+
+## QC
+```{r}
+PBMC_seurat <- subset(PBMC_seurat, subset = nFeature_RNA > 500 & nFeature_RNA < 4000 & percent.mt < 30 & nCount_RNA < 8000 & nCount_RNA > 500 )
+```
+
+## normalize
+```{r}
+PBMC_seurat_list <- SplitObject(PBMC_seurat, split.by = "samples")
+PBMC_seurat_list <- lapply(PBMC_seurat_list, function(obj) {
+  SCTransform(obj, assay = "RNA")
+})
+```
+
+## integration
+```{r}
+features <- SelectIntegrationFeatures(object.list = PBMC_seurat_list, nfeatures = 2000)
+PBMC_seurat_list <- PrepSCTIntegration(object.list = PBMC_seurat_list, anchor.features =features)
+PBMC_seurat_list <- lapply(PBMC_seurat_list, function(obj) {
+  RunPCA(obj)
+})
+
+anchors <- FindIntegrationAnchors(object.list = PBMC_seurat_list, normalization.method = "SCT",
+    anchor.features = features, reduction="rpca")
+PBMC_integrated_seurat <- IntegrateData(anchorset = anchors, normalization.method = "SCT", dims = 1:20)
+```
+
+```{r}
+DefaultAssay(PBMC_integrated_seurat) <- "integrated"
+PBMC_integrated_seurat <- RunPCA(PBMC_integrated_seurat, assay = "integrated")
+PBMC_integrated_seurat <- RunUMAP(PBMC_integrated_seurat, reduction = "pca", dims = 1:30)
+```
+
+```{r}
+DimPlot(PBMC_integrated_seurat, group.by = "platform")
+```
+
+```{r}
+PBMC_integrated <- RunPCA(PBMC_integrated, assay = "integrated")
+PBMC_integrated <- RunUMAP(PBMC_integrated, reduction = "pca", dims = 1:30)
+PBMC_integrated <- FindNeighbors(PBMC_integrated, reduction = "pca", dims = 1:20)
+PBMC_integrated <- FindClusters(PBMC_integrated, resolution = 0.5, verbose = FALSE)
+```
+
+```{r}
+DimPlot(PBMC_integrated, group.by = "seurat_clusters", label = T)
+```
+
+### annotation
+```{r}
+PBMC_integrated <- SCTransform(PBMC_integrated)   # default assay is RNA
+DefaultAssay(PBMC_integrated) <- "SCT"
+```
+
+```{r}
+library(STACAS)
+data(EnsemblGeneTable.Hs)
+PBMC_integrated <- StandardizeGeneSymbols(PBMC_integrated, slots = c("counts"),
+                                          EnsemblGeneTable = EnsemblGeneTable.Hs)
+```
+
+```{r}
+library(Azimuth)
+DefaultAssay(PBMC_integrated) <- "RNA"
+PBMC_azimuth <- RunAzimuth(PBMC_integrated, reference = "pbmcref", assay = "RNA")
+```
+
+```{r}
+P1 <- DimPlot(PBMC_azimuth, group.by = "predicted.celltype.l2", label = T, 
+              reduction = "umap") + labs(title = "PBMC_azimuth")
+P2 <- DimPlot(PBMC_integrated, group.by = "seurat_clusters" , label = T) + 
+  labs(title = "PBMC_integrated")
+P1+P2
+```
+
+```{r}
+DimPlot(PBMC_azimuth, group.by = "predicted.celltype.l1", label = T, reduction = "umap",repel = T)
+```
+
+Add time point to metadata column
+```{r}
+samples <- PBMC_azimuth$samples
+time_points <- stringr::str_extract(samples, "V[0-9]+")
+PBMC_azimuth$time_point <- time_points
+```
+
+Add patient to metadata column
+```{r}
+patients <- ifelse(grepl("^BCC[0-9]+", samples),      
+                   stringr::str_extract(samples, "BCC[0-9]+"),
+                   stringr::str_extract(samples, "P[0-9]+"))
+patients <- gsub("^P", "BCC", patients)
+PBMC_azimuth$Patient <- patients
+```
+
+```{r}
+options(future.globals.maxSize = 100 * 1024^3)  # 100GB
+
+PBMC_azimuth <- SCTransform(PBMC_azimuth)
+```
+
+```{r}
+P1 <- VlnPlot(PBMC_azimuth, group.by = "samples", features = "XIST",
+              pt.size = 0, assay = "SCT" , slot = "counts") +
+  theme(axis.text = element_text(size = 6))
+```
+
+```{r}
+PBMC_azimuth <- subset(PBMC_azimuth, subset = seurat_clusters != "20")
+PBMC_azimuth_9 <- subset(PBMC_azimuth, subset = Patient != "BCC2")
+```
+Because, we find P2 timepoint1 was mixed up with another sample
+
+```{r}
+cluster_mapping <- c(
+  "0"  = "NK",
+  "1"  = "NK",
+  "17" = "NK",
+  "5"  = "CD8+ T",
+  "12" = "CD8+ T",
+  "13" = "CD8+ T",
+  "18" = "CD8+ T",
+  "6"  = "CD4+ T",
+  "7"  = "CD4+ T",
+  "10" = "CD4+ T",
+  "2"  = "CD14+ mono",
+  "3"  = "CD14+ mono",
+  "4"  = "CD14+ mono",
+  "8"  = "CD14+ mono",
+  "16" = "CD14+ mono",
+  "9"  = "CD16+ mono",
+  "11" = "B",
+  "15" = "B",
+  "19" = "B",
+  "21" = "pDC",
+  "14" = "Tregs"
+)
+```
+
+```{r}
+PBMC_azimuth_9$initial_annotation <- as.character(PBMC_azimuth_9$seurat_clusters)
+PBMC_azimuth_9$initial_annotation <- plyr::mapvalues(
+  PBMC_azimuth_9$initial_annotation,
+  from = names(cluster_mapping),
+  to = cluster_mapping
+)
+PBMC_azimuth_9$new_annotation <- PBMC_azimuth_9$initial_annotation
+PBMC_azimuth_9$new_annotation[PBMC_azimuth_9$predicted.celltype.l2 == "MAIT" ] <- "MAIT"
+```
+
+```{r}
+p <- DimPlot(PBMC_azimuth_9, group.by = "predicted.celltype.l1",repel = T, label = T)
+```
+
+```{r}
+p <- DimPlot(PBMC_azimuth_9, group.by = "new_annotation",repel = T, label = T,raster=FALSE)
+```
+
+```{r}
+DimPlot(PBMC_azimuth_9, group.by = "seurat_clusters",repel = T, label = T)
+```
+
+```{r}
+VlnPlot(PBMC_azimuth_9, features = 'predicted.celltype.l2.score', group.by = 'new_annotation')
+```
+
+#Supplementary Figure 2
+```{r}
+features.list <- list(
+  "B"            = c("MS4A1"),
+  "CD14+ Mono"   = c("CD14"),
+  "CD16+ Mono"   = c("FCGR3A"),
+  "CD4+ T"       = c("CD4"),
+  "CD8+ T"       = c("CD8A"),
+  "MAIT"         = c("SLC4A10"),
+  "NK"           = c("KLRD1"),
+  "pDC"          = c("CLEC4C"),
+  "Tregs"        = c("FOXP3")
+)
+p <- DotPlot(
+  PBMC_azimuth_9,
+  group.by = "new_annotation",
+  features = features.list,
+  dot.scale = 6   
+) +
+  RotatedAxis() +    
+  theme(
+    axis.text.x = element_text(size = 8, angle = 45, hjust = 1),
+    axis.text.y = element_text(size = 9),
+    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 6),
+    strip.text.x = element_text(size = 6, face = "bold")
+  ) +
+  labs(x = NULL, y = NULL)  
+p + scale_y_discrete(limits = c("B", "CD14+ Mono","CD16+ Mono","CD4+ T","CD8+ T",
+                                "MAIT","NK" ,"pDC","Tregs"))
+
+```
+
+## cell composition
+```{r}
+tp_map <- c(
+  V1  = "W0",
+  V3  = "W2",
+  V4  = "W4",
+  V13 = "W26"
+)
+
+PBMC_azimuth_9@meta.data$new_time_point <- dplyr::recode(
+  PBMC_azimuth_9$time_point,
+  !!!tp_map,               
+  .default = NA_character_          
+)
+table(PBMC_azimuth_9$new_time_point, useNA = "ifany")
+```
+
+#Figure 3c, Supplementary Figure 3a
+```{r}
+cell_abundance_new <- PBMC_azimuth_9@meta.data %>%
+  group_by(Patient, new_time_point, new_annotation) %>%
+  summarise(count = n()) %>%
+  group_by(Patient, new_time_point) %>%
+  mutate(frequency = count / sum(count)) %>%
+  ungroup()
+cell_abundance_new$new_time_point <- factor(cell_abundance_new$new_time_point, levels = c("W0", "W2", "W4", "W26"))
+
+myColors = c("B"  = "#E31A1C",  "CD14+ mono" = "#CAB2D6", "CD16+ mono" = "#7A3D7A", "CD4+ T" = "#FF7F00","CD8+ T" = "#FFFF00", "MAIT" = "#46FF3E","NK" = "#A6CEE3", "Tregs" = "#B15928"  ,  "pDC" = "#FB9A99")
+
+create_patient_plot <- function(data, patient_id, colors) {
+  data %>%
+    filter(Patient == patient_id) %>% 
+    ggplot(aes(x = new_time_point, y = frequency, fill = new_annotation)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(name   = "Cell Type",  values = colors,breaks = names(colors), drop = FALSE) +
+    labs(
+      title = paste("Patient", patient_id),
+      x = "Time Point",
+      y = "Frequency",
+      fill = "Cell Type"
+    ) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.key.size   = unit(0.4, "cm"),
+          legend.text       = element_text(size = 8),
+          legend.title      = element_text(size = 10))  
+}
+
+patient_ids <- c("BCC1", "BCC3", "BCC4", "BCC5", "BCC6", "BCC7", "BCC8", "BCC9", "BCC10")
+#patient_ids <- c("BCC1", "BCC5", "BCC6", "BCC7", "BCC8", "BCC9", "BCC10") # removing patients with hematological malignancies
+patient_plots <- lapply(patient_ids, function(patient_id) {
+  create_patient_plot(cell_abundance_new, patient_id, myColors)
+})
+
+combined_plot <- ggarrange(
+  plotlist       = patient_plots,
+  nrow           = 2,
+  ncol           = 5,
+  common.legend  = TRUE,        
+  legend         = "right"  
+)
+
+print(combined_plot)
+```
+
+```{r}
+pdf("cellcomposition_barplot_newColors.pdf", width = 10, height = 6)
+print(combined_plot)
+dev.off()
+```
+
+## DEGs and GO analysis for larger cluster
+Calculate the DEGs
+```{r}
+library(dplyr)
+
+output_dir <- "DEGs_Volcano_GO/"
+pval_threshold <- 0.05  
+logfc_threshold <- 1   
+target_celltype <- "CD8+ T"
+
+dir.create(output_dir, showWarnings = FALSE, recursive = TRUE)
+
+calculate_DEGs <- function(seurat_obj) {
+  for (patient in c(paste0("BCC", 1:9), "BCC10")) {
+    time_comparisons <- list(
+      c("V1", "V3"),
+      c("V3", "V4"),
+      c("V4", "V13")
+    )
+    
+    for (comp in time_comparisons) {
+      time1 <- comp[1]
+      time2 <- comp[2]
+      comp_name <- paste0(time1, "_vs_", time2)
+      
+      sub_obj <- subset(
+        seurat_obj,
+        subset = Patient == patient & 
+          new_annotation == target_celltype &
+          time_point %in% comp
+      )
+      
+      Idents(sub_obj) <- "time_point"
+      deg <- tryCatch({
+        FindMarkers(
+          sub_obj,
+          ident.1 = time1,
+          ident.2 = time2,
+          test.use = "wilcox",
+          min.pct = 0.01,
+          logfc.threshold = 1
+        )
+      }, error = function(e) {
+        message("DEG failed for ", patient, " ", comp_name, ": ", e$message)
+        return(NULL)
+      })
+      
+      if (!is.null(deg) && nrow(deg) > 0) {
+        deg_file <- file.path(output_dir, 
+                             sprintf("DEG_%s_%s_%s.csv", 
+                                     patient, target_celltype, comp_name))
+        write.csv(deg, deg_file)
+        message("Saved DEG results: ", deg_file)
+      }
+    }
+  }
+}
+calculate_DEGs(PBMC_azimuth)
+```
+
+volcano plots
+```{r}
+library(ggplot2)
+library(ggrepel)
+library(patchwork)
+
+plot_volcano <- function(deg_file) {
+  deg <- read.csv(deg_file, row.names = 1)
+  
+  deg$diffexpressed <- "NO"
+  deg$diffexpressed[deg$avg_log2FC > logfc_threshold & deg$p_val_adj < pval_threshold] <- "UP"
+  deg$diffexpressed[deg$avg_log2FC < -logfc_threshold & deg$p_val_adj < pval_threshold] <- "DOWN"
+  
+  top_genes <- deg %>%
+    filter(diffexpressed != "NO") %>%
+    mutate(score = (-log10(p_val_adj)) * abs(avg_log2FC)) %>%
+    arrange(desc(score)) %>%
+    head(10)
+  
+  ggplot(deg, aes(x = avg_log2FC, y = -log10(p_val_adj), color = diffexpressed)) +
+    geom_point(alpha = 0.6, size = 1.5) +
+    geom_text_repel(data = top_genes, aes(label = rownames(top_genes)),
+                    size = 3, box.padding = 0.5) +
+    scale_color_manual(values = c("DOWN" = "blue", "NO" = "grey", "UP" = "red")) +
+    geom_vline(xintercept = c(-logfc_threshold, logfc_threshold), linetype = "dashed") +
+    geom_hline(yintercept = -log10(pval_threshold), linetype = "dashed") +
+    labs(title = gsub("^DEG_(BCC\\d+)_CD8 T_(.+)\\.csv$", "\\1_\\2", basename(deg_file)),
+       x = "Log2 Fold Change", y = "-Log10(Adj.P)") +
+    theme_classic()
+}
+
+volcano_plots <- list()
+
+deg_files <- list.files(output_dir, pattern = "DEG_.*\\.csv", full.names = TRUE)
+
+for (f in deg_files) {
+  p <- plot_volcano(f)
+  output_file <- file.path(output_dir, gsub(".csv", "_volcano.pdf", basename(f)))
+  ggsave(output_file, p, width = 6, height = 5)
+  volcano_plots[[basename(f)]] <- p
+}
+
+v1_v3_plots <- list()
+v3_v4_plots <- list()
+v4_v13_plots <- list()
+
+for (plot_name in names(volcano_plots)) {
+  if (grepl("V1_vs_V3", plot_name)) {
+    v1_v3_plots[[plot_name]] <- volcano_plots[[plot_name]]
+  } else if (grepl("V3_vs_V4", plot_name)) {
+    v3_v4_plots[[plot_name]] <- volcano_plots[[plot_name]]
+  } else if(grepl("V4_vs_V13", plot_name)){
+    v4_v13_plots[[plot_name]] <- volcano_plots[[plot_name]]
+    
+  }
+}
+extract_patient_number <- function(name) {
+  as.numeric(gsub(".*BCC([0-9]+).*", "\\1", name))
+}
+
+sort_plots <- function(plot_list) {
+  patient_order <- sapply(names(plot_list), extract_patient_number)
+  
+  sorted_names <- names(plot_list)[order(patient_order)]
+  
+  plot_list[sorted_names]
+}
+
+v1_v3_plots_sorted <- sort_plots(v1_v3_plots)
+v3_v4_plots_sorted <- sort_plots(v3_v4_plots)
+v4_v13_plots_sorted <- sort_plots(v4_v13_plots)
+
+draw_volcano <- function(valcano_list){
+  if (length(valcano_list) > 0) {
+  combined_volcano <- wrap_plots(valcano_list, ncol = 5, nrow = 2) +
+    plot_annotation(title = "Volcano Plots")
+  ggsave(file.path(output_dir, paste0("Combined_Volcano_", substitute(valcano_list), ".pdf")), 
+         combined_volcano, width = 25, height = 10)
+} else {
+  message("No valid volcano plots to combine!")
+}
+}
+
+draw_volcano(v1_v3_plots_sorted)
+draw_volcano(v3_v4_plots_sorted)
+draw_volcano(v4_v13_plots_sorted)
+```
+
+## GSEA analysis
+1736 gene sets. Canonical Pathways gene sets derived from the Reactome pathway database.
+```{r}
+library(fgsea)
+library(msigdbr)
+library(ggplot2)
+library(stringr)
+
+output_dir_REACTOME <- file.path(output_dir, "REACTOME_CD8T")
+dir.create(output_dir_REACTOME, showWarnings = FALSE, recursive = TRUE)
+
+m_df <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+fgsea_sets <- split(m_df$gene_symbol, m_df$gs_name)
+
+run_gsea_analysis <- function(deg, patient, comp_name) {
+  required_cols <- c("avg_log2FC")
+  if (!all(required_cols %in% colnames(deg))) {
+    message("Missing required columns in DEG file for ", patient, " ", comp_name)
+    return(NULL)
+  }
+  
+   ranks <- deg %>%
+    dplyr::mutate(gene = rownames(.)) %>%  
+    dplyr::select(gene, avg_log2FC) %>%
+    na.omit() %>%
+    dplyr::arrange(desc(avg_log2FC)) %>%
+    {setNames(.$avg_log2FC, .$gene)}
+  
+  set.seed(123) 
+  fgsea_res <- fgsea(
+    pathways = fgsea_sets,
+    stats = ranks,
+  )
+  
+  fgsea_tidy <- fgsea_res %>%
+    as_tibble() %>%
+    mutate(
+      pathway = str_replace(pathway, "REACTOME_", ""),
+      pathway = str_replace_all(pathway, "_", " "),
+      leadingEdge = sapply(leadingEdge, function(x) paste(x, collapse = ","))
+    ) %>%
+    arrange(padj, desc(abs(NES)))
+    return(fgsea_tidy)
+}
+
+plot_gsea <- function(gsea_res, title = "GSEA Results", 
+                     padj_cutoff = 0.25, top_n = 20, 
+                     string_width = 30) {
+  if (nrow(gsea_res) == 0) return(NULL)
+
+  plot_data <- gsea_res %>%
+    dplyr::filter(padj < padj_cutoff) %>%
+    arrange(desc(NES)) %>%
+    head(top_n)
+  
+  if (nrow(plot_data) == 0) return(NULL)
+
+  ggplot(plot_data, aes(reorder(pathway, NES), NES)) +
+    geom_col(aes(fill = NES), width = 0.6, color = "black") +
+    scale_fill_gradient2(low = "blue", mid = "white", high = "red", 
+                        midpoint = 0, limits = c(-3.5, 3.5)) +
+    coord_flip() +
+    labs(title = title, 
+         x = NULL, 
+         y = "Normalized Enrichment Score (NES)",
+         fill = "NES") +
+    theme_classic() +
+    theme(
+      plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+      axis.text.y = element_text(size = 7),
+      axis.text.x = element_text(size = 10),
+      legend.position = "none"
+    ) +
+    scale_x_discrete(labels = function(x) str_wrap(x, width = string_width))
+}
+
+deg_files <- list.files(output_dir, pattern = "DEG_.*\\.csv", full.names = TRUE)
+
+
+gsea_v1_v3_plots <- list()
+gsea_v3_v4_plots <- list()
+gsea_v4_v13_plots <- list()
+
+for (deg_file in deg_files) {
+  file_info <- gsub("DEG_|.csv", "", basename(deg_file)) %>%
+    strsplit("_") %>% unlist()
+  patient <- file_info[1]
+  comp_name <- paste(file_info[3], "vs", file_info[5])
+  
+  
+  deg <- read.csv(deg_file, row.names = 1)
+  
+  gsea_res <- run_gsea_analysis(deg, patient, comp_name)
+  
+  if (is.null(gsea_res) || nrow(gsea_res) == 0) {
+    message("GSEA failed for ", patient, " ", comp_name)
+    next
+  }
+
+  gsea_csv <- file.path(output_dir_REACTOME, gsub("DEG_", "GSEA_", basename(deg_file)))
+  write.csv(gsea_res, gsea_csv, row.names = FALSE)
+
+  gsea_plot <- plot_gsea(gsea_res, 
+                        title = paste(patient, comp_name),
+                        padj_cutoff = 0.25, 
+                        top_n = 20)
+  
+  if (!is.null(gsea_plot)) {
+    if (grepl("V1_vs_V3", deg_file)) {
+      gsea_v1_v3_plots[[patient]] <- gsea_plot
+    } else if (grepl("V3_vs_V4", deg_file)) {
+      gsea_v3_v4_plots[[patient]] <- gsea_plot
+    } else if (grepl("V4_vs_V13", deg_file)){
+      gsea_v4_v13_plots[[patient]] <- gsea_plot
+      
+    }
+    
+    output_file <- file.path(output_dir_REACTOME, gsub("DEG_", "GSEA_", basename(deg_file)))
+    ggsave(gsub(".csv", ".pdf", output_file), gsea_plot, width = 15, height = 20)
+  }
+}
+
+gsea_v1_v3_sorted <- sort_patients(gsea_v1_v3_plots)
+gsea_v3_v4_sorted <- sort_patients(gsea_v3_v4_plots)
+gsea_v4_v13_sorted <- sort_patients(gsea_v4_v13_plots)
+
+combine_gsea_plots <- function(plot_list, output_name, ncol = 4, width = 18, height = 15) {
+  if (length(plot_list) == 0) {
+    message("No plots to combine for ", output_name)
+    return()
+  }
+  
+  
+  combined_plot <- wrap_plots(plot_list, ncol = ncol) +
+    plot_annotation(
+      title = output_name,
+      theme = theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 16))
+    )
+  
+
+  
+  output_path <- file.path(output_dir_REACTOME, paste0("Combined_GSEA_", output_name, ".pdf"))
+  ggsave(output_path, combined_plot, width = width, height = height)
+}
+
+combine_gsea_plots(gsea_v1_v3_sorted, "V1_vs_V3", height = 13)
+combine_gsea_plots(gsea_v3_v4_sorted, "V3_vs_V4", ncol = 5, width = 20, height = 10)
+combine_gsea_plots(gsea_v4_v13_sorted, "V4_vs_V13", height = 13)
+```
+
+#Figure 3d and Supplementary Figure 3c
+Just CD4+, CD8+, NKs (IFNg) and CD14+, CD16+ (TNFa)
+```{r}
+targetcell <- "CD14+ mono" # CD4+ T, CD8+ T, NKs, CD14+ mono or CD16+ mono 
+output_dir <- paste0("/mnt/DATA4/BCC-Spatial/zsolt/", targetcell)
+parse_gsea_filename <- function(filename) {
+  comparison <- str_extract(filename, "V\\d+_vs_V\\d+")
+    
+  patient <- str_match(filename, "GSEA_(BCC\\d+).*_V\\d+_vs_V\\d+")[,2]
+    
+  data.frame(patient = patient, comparison = comparison)
+}
+output_dir_REACTOME <- file.path(output_dir, targetcell,"REACTOME")
+gsea_files <- list.files(output_dir_REACTOME, 
+                          pattern = "GSEA_.*\\.csv", 
+                          full.names = TRUE)
+
+combined_gsea <- map_dfr(gsea_files, function(file) {
+  df <- read_csv(file, show_col_types = FALSE)
+  file_info <- parse_gsea_filename(basename(file))
+  df %>%
+      mutate(patient = factor(file_info$patient,levels = c("BCC1", "BCC5", "BCC6", "BCC7", "BCC8", "BCC9", "BCC10")),
+             comparison = factor(file_info$comparison,
+                                 levels = c("V1_vs_V3", "V1_vs_V4", "V1_vs_V13"))) %>%
+      dplyr::select(patient, comparison, pathway, NES, padj, everything())
+  })
+#change the pathway as you wish
+pathway_name <- c(#"INTERFERON GAMMA SIGNALING"
+    "TNF SIGNALING"
+    )
+processed_data <- combined_gsea %>%
+  filter(patient != "BCC2") %>%
+  filter(pathway %in% pathway_name) %>%
+  mutate(
+    significance = case_when(
+      padj < 0.001 ~ "***",
+      padj < 0.01 ~ "**",
+      padj < 0.05 ~ "*",
+      TRUE ~ ""
+    ),
+    direction = factor(
+      ifelse(NES > 0, "Up", "Down"),
+      levels = c("Up", "Down")
+    )
+)
+
+plot_data <- processed_data %>%
+  filter(pathway == pathway_name) %>%
+  mutate(comparison = factor(comparison, 
+                             levels = c("V1_vs_V3",
+                                        "V1_vs_V4",
+                                        "V1_vs_V13"))) %>% 
+  arrange(patient, comparison)
+
+plot_data <- plot_data %>%
+  group_by(patient) %>%
+  do({
+      bind_rows(
+          data.frame(patient = as.character(.$patient[1]),
+                     comparison = "Baseline",
+                     pathway = pathway_name,
+                     NES = 0),
+            .
+    )
+    }) %>%
+    ungroup()
+  
+plot_data$comparison <- factor(
+  plot_data$comparison,
+  levels = c("Baseline", "V1_vs_V3", "V1_vs_V4", "V1_vs_V13")
+)
+
+my_comparisons <- list(
+  c("Baseline",  "V1_vs_V3"),
+  c("Baseline",  "V1_vs_V4"),
+  c("Baseline",  "V1_vs_V13")
+)
+ 
+stat.test <- plot_data %>%
+  t_test(NES ~ comparison, 
+        comparisons = my_comparisons, 
+        paired = FALSE) %>%
+  adjust_pvalue(method = "bonferroni") %>%
+  mutate(y.position = max(plot_data$NES) + seq(0.5, 1.5, length.out = n())) 
+
+plot_data <- plot_data %>% filter(comparison != "Baseline")
+
+p <- ggplot(plot_data, aes(x = comparison, y = NES)) +
+  geom_boxplot() +
+  geom_point(size = 1) +
+  labs(y = "NES") +
+  theme_classic(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        panel.border = element_rect(colour="black",fill=NA,linewidth=0.3)) +
+  scale_x_discrete(labels = c("W2", "W4", "W26")) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50") +
+  ylim(-2, 2.2)
+
+
+p <- p + stat_pvalue_manual(stat.test, label = "p.adj.signif",
+                     tip.length = 0, bracket.size = 0, 
+                     xmin = "group2", xmax = "group2")
+p
+pdf_file <- file.path(output_dir, paste0("9_GSEA_linegraphs_adjustP_",
+                                         targetcell,"_", "TNFa", ".pdf"))
+ggsave(
+  filename = pdf_file,
+  plot = p,
+  width = 4,
+  height = 4, 
+  device = cairo_pdf,
+  units = "in")
+
+```
+
+# Similarity of cell composition for different timepoint
+```{r}
+library(ecodist)
+library(vegan)
+library(gtable)
+library(reshape2)
+```
+
+```{r extract}
+meta_patient <- PBMC_azimuth_9@meta.data$Patient
+meta_timepoints <- PBMC_azimuth_9@meta.data$new_time_point
+PBMC_azimuth_9@meta.data$new_samples <- paste(meta_patient, meta_timepoints, sep = "_")
+
+data <- dcast(PBMC_azimuth_9@meta.data, new_annotation ~ new_samples, value.var = "Patient")
+data <- data[!is.na(data$new_annotation), ]
+names(data)[1] <- "cell_type"
+coldata <- unique(PBMC_azimuth_9@meta.data[, c( "time_point", "new_samples","Patient")])
+
+```
+
+```{r distance_from_baseline}
+coldata$dist_from_baseline = 0
+
+patient_ids <- c("BCC1", "BCC3", "BCC4", "BCC5", "BCC6", "BCC7", "BCC8", "BCC9", "BCC10")
+# the next bits of code are based on code received from Patrick Turko
+for (a in patient_ids) {
+  x <- coldata[coldata$Patient == a,]
+  baseline <- data[,paste(a,"V1", sep = "_")]
+  for(i in x$new_samples){
+    compsamp <- data[, i]
+    dist <- distance(rbind(baseline, compsamp), "bray")
+    x$dist_from_baseline[x$new_samples == i] <- as.numeric(dist)
+  }
+  coldata[coldata$Patient == a,] <- x
+}
+```
+
+#Figure 3b, Supplementary Figure 3a
+```{r}
+coldata_ordered <- coldata %>%
+  mutate(time_point = factor(time_point, levels = c("V1", "V3", "V4", "V13")))
+ 
+dist_df <- coldata_ordered
+
+summary_df <- dist_df %>%
+  group_by(time_point) %>%
+  summarise(
+    mean_dist = mean(dist_from_baseline),
+    se_dist = sd(dist_from_baseline) / sqrt(n())
+  ) %>%
+  mutate(time_point = factor(time_point, levels = c("V1", "V3", "V4", "V13")))
+
+c <- ggplot(summary_df, aes(x = time_point, y = mean_dist, group = 1)) +
+  geom_line(color = "#2c7bb6", linewidth = 1, alpha = 0.8) +
+  geom_point(size = 3, color = "#d7191c") +
+  geom_errorbar(aes(ymin = mean_dist - se_dist, ymax = mean_dist + se_dist), width = 0.1) +
+  labs(
+    title = "Cell composition changing for all the samples",
+    x = "Time Point",
+    y = "Distance from Baseline"
+  ) +
+  theme_bw() +
+  theme(
+    plot.title  = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor  = element_blank()
+  ) +
+  scale_y_continuous(limits = c(0, 0.3))
+c
+```
