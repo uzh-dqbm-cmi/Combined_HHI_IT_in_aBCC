@@ -10,8 +10,12 @@ library(tidyverse)
 library(gt)
 library(dplyr)
 library(tidyr)
-data <- read.xlsx("Kopie von Patient_characteristics3.xlsx", 
-                  sheet = "Adverse Events") %>%
+
+data <- read.delim(
+  "AE.tsv",
+  header = TRUE,
+  sep = "\t"
+) %>%
   mutate(Relatedness = str_remove(Relatedness, " $")) # remove trailing spaces
 
 ```
