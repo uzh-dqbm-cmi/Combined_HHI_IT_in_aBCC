@@ -1,0 +1,22 @@
+Patient ID	Sex	Age	Comorbidities	Tumor Stage	prior local therapy	prior systemic therapy 
+Pat1	female 	77		IIIB	surgery	vismodegib, itraconazol
+Pat2	male	88	Chronic lymphatic leukemia	IIB	surgery, radiotherapy	vismodegib, itraconazol
+Pat3	male	77	Diffuse large B-cell lympoma	IIB	surgery, radiotherapy	vismodegib
+Pat4	female 	56		IIA	surgery	vismodegib, sonidegib 
+Pat5	male	79	Gorlin Goltz Syndrome 	IIIC	surgery	vismodegib, sonidegib
+Pat6	male	82		IV	surgery	- 
+Pat7	male 	76	Chronic myeloid leukemia	IIIB	- 	- 
+Pat8	male	77		IV	surgery, radiotherapy	vismodegib, sonidegib, itraconazol
+Pat9	female 	70		IIIB	radiotherapy	- 
+Pat10	male	70		IIA	- 	- 
+Pat11	female 	72		IIIC	surgery, radiotherapy	- 
+Pat12	male	57		IIIC	- 	- 
+Pat13	male	88		IIA	radiotherapy	- 
+Pat14	female 	92		IIIB	surgery	- 
+Pat15	male	75		IIIB	- 	- 
+Pat16	female 	86		IIIB	- 	- 
+Pat17	male	56		IIIC	- 	- 
+Pat18	female 	55	Gorlin Golz Syndrome	IIIB	surgery	vismodegib, sonidegib 
+Pat19	male	48		IIA	surgery	- 
+Pat20	female 	63	Xeroderma pigmentosum	IIB	surgery	vismodegib, sonidegib 
+

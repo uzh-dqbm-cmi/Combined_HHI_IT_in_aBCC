@@ -1,0 +1,243 @@
+patient 	Adverse Events	Grade	Relatedness	Medication_related	Start	Stopp	SAE	AE_group
+rqb506	Abdominal pain	G2	unrelated		06.05.2021	08.05.2021	no	
+rqb506	Abdominal pain	G1	unrelated		09.05.2021	01.07.2021	no	
+ezu529	Alkaline phosphatase increased	G1	possibly related	Cemiplimab	02.10.2023	ongoing	no	
+sai395	Alkaline phosphatase increased	G3	possibly related	Cemiplimab	14.09.2021	16.09.2021	no	
+sai395	Alkaline phosphatase increased	G2	possibly related	Cemiplimab	17.09.2021	22.09.2021	no	
+sai395	Alkaline phosphatase increased	G1	possibly related	Cemiplimab	23.09.2021	Ongoing	no	
+ eth049	Alkaline phosphatase increased	G1	related		12.12.2023	26.02.2024	no	
+olj603	Alkaline phosphatase increased	G1	possibly related	Cemiplimab	24.05.2022	14.06.2022	no	
+rhx975	Alkaline phosphatase increased	G1	possibly related		19.04.2022	10.05.2022	no	
+rhx975	Alkaline phosphatase increased	G1	possibly related		30.05.2022	04.08.2022	no	
+yza258	Alopecia	G1	related	Sonidegib	05.07.2024	ongoing	no	
+rqb506	Alopecia	G2	related	Sonidegib	25.05.2021	ongoing	no	
+olj603	Alopecia	G1	possibly related	Sonidegib	unknown	30.08.2022	no	
+sai395	ALT increased	G1	possibly related	Cemiplimab	09.09.2021	13.09.2021	no	Liver enzyme elevatiom
+sai395	ALT increased	G3	possibly related	Cemiplimab	14.09.2021	22.09.2021	no	Liver enzyme elevatiom
+sai395	ALT increased	G1	possibly related	Cemiplimab	23.09.2021	06.10.2021	no	Liver enzyme elevatiom
+olj603	ALT increased	G1	possibly related	Cemiplimab	03.05.2022	10.05.2022	no	Liver enzyme elevatiom
+olj603	ALT increased 	G1	possibly related	Cemiplimab	24.05.2022	05.07.2022	no	Liver enzyme elevatiom
+ptw592	Anemia 	G1	possibly related		02.04.2024	ongoing	no	
+ eth049	Anemia 	G1	related		27.12.2023	ongoing	no	
+wky208	Aphtosis	G1	possibly related		09.06.2022	16.06.2022	no	
+ooc047	Arterial hypertension 	G3	unrelated		02.07.2024		no	
+ eth049	Arterial hypertension 	G3	unrelated		27.02.2024		no	
+ooc047	Arthralgia	G1	possibly related	Cemiplimab	04.06.2024	ongoing	no	
+wky208	Arthralgia	G1	possibly related		24.07.2022	25.08.2022	no	
+rhx975	Arthralgia	G1	unrelated		21.04.2022	23.04.2022	no	
+sai395	Arthralgia	G1	possibly related		22.07.2021	05.08.2021	no	
+rhx975	Arthralgia	G1	unrelated		17.04.2022	28.04.2022	no	
+wky208	Arthritis	G2	possibly related		03.10.2022	ongoing	no	
+Icf063	AST increased	G1	related		08.11.2022	15.11.2022	no	Liver enzyme elevatiom
+Icf063	AST increased	G1	related		08.11.2022	06.12.2022	no	Liver enzyme elevatiom
+qqe208	AST increased	G1	possibly related		31.10.2023	02.11.2023	no	Liver enzyme elevatiom
+lkw727	AST increased	G1	possibly related		15.03.2022	29.03.2022	no	Liver enzyme elevatiom
+igs319	Atrial fibrilation 	G2	unrelated		18.03.2022	ongoing	no	
+ eth049	Back pain	G3	unrelated		27.02.2024	ongoing	no	
+qqe208	Blurred vision	G3	unrelated		31.10.2023	07.11.2023	no	
+lkw727	Cardiomyositis 	G2	possibly related		15.03.2022	26.04.2022	no	
+lkw727	Cardiomyositis 	G2	possibly related		15.03.2022	18.03.2022	yes	
+ eth049	Cognitive disturbance	G2	unrelated		05.12.2023	11.12.2023	no	
+ eth049	Cognitive disturbance	G2	unrelated		29.01.2024	03.02.2024	no	
+ eth049	Cognitive disturbance	G2	unrelated		27.02.2024		no	
+wky208	Colitis	G2	related	Cemiplimab	26.09.2022	18.10.2022	no	
+wky208	Colitis	G2	related	Cemiplimab	03.10.2022	11.10.2022	yes	
+ooc047	Constipation	G1	possibly related	Sonidegib	10.04.2024	ongoing	no	
+myj913	Constipation	G1	possibly related	Sonidegib	03.08.2021	14.08.2021	no	
+ruk146	Cough	G1	possibly related	Cemiplimab	18.04.2024	16.07.2024	no	
+Icf063	COVID-19 infection 	G1	unrelated		20.09.2022	27.09.2022	no	
+Icf063	Creatine phosphokinase increased	G1	related	Sonidegib	20.09.2022	27.09.2022	no	
+Icf063	Creatine phosphokinase increased	G4	related	Sonidegib	08.11.2022	15.11.2022	no	
+Icf063	Creatine phosphokinase increased	G1	related	Sonidegib	15.11.2022	06.12.2022	no	
+ooc047	Creatine phosphokinase increased	G1	related	Sonidegib	04.06.2024	16.09.2024	no	
+ooc047	Creatine phosphokinase increased	G1	related	Sonidegib	19.11.2024	ongoing	no	
+rqb506	Creatine phosphokinase increased	G2	related	Sonidegib	22.06.2021	12.07.2021	no	
+rqb506	Creatine phosphokinase increased	G1	related	Sonidegib	12.07.2021	ongoing	no	
+ezu529	Creatine phosphokinase increased	G1	related	Sonidegib	27.06.2023	03.07.2023	no	
+ezu529	Creatine phosphokinase increased	G1	related	Sonidegib	27.06.2023	25.07.2023	no	
+ezu529	Creatine phosphokinase increased	G1	related	Sonidegib	02.10.2023	ongoing	no	
+igs319	Creatine phosphokinase increased	G2	related	Sonidegib	31.05.2022	ongoing	no	
+ruk146	Creatine phosphokinase increased	G2	related	Sonidegib	26.03.2024	ongoing	no	
+lkw727	Creatine phosphokinase increased	G1	related	Sonidegib	15.03.2022	29.03.2022	no	
+ eth049	Creatine phosphokinase increased	G1	related	Sonidegib	18.03.2024	ongoing	no	
+myj913	Creatine phosphokinase increased	G1	related	Sonidegib	01.07.2021	ongoing	no	
+wky208	Creatine phosphokinase increased	G1	related	Sonidegib	13.05.2022	24.05.2022	no	
+wky208	Creatine phosphokinase increased	G1	related	Sonidegib	25.10.2022	11.11.2022	no	
+mce555	Creatine phosphokinase increased	G1	related	Sonidegib	05.08.2021	12.01.2022	no	
+rhx975	Creatine phosphokinase increased	G1	related	Sonidegib	10.05.2022	31.05.2022	no	
+rqb506	Cutaneous melanoma	G2	unrelated		22.06.2021	ongoing	no	
+ipx283	Death	G5	unrelated				yes	
+ezu529	Decompensated heart failure		unrelated		07.08.2023	24.08.2023	no	
+Icf063	Decreased libido	G1	possibly related		06.09.2022	16.05.2022	no	
+rqb506	Lymphocyte count decreased	G1	possibly related		13.07.2021	05.10.2021	no	
+ruk146	Lymphocyte count decreased	G1	possibly related		06.02.2024	04.03.2024	no	
+ eth049	Pancreatic amylase decreased	G1	unrelated	Sonidegib	14.11.2023	04.12.2023	no	
+myj913	Platelete count decreased	G1	possibly related		03.08.2021	ongoing	no	
+igs319	Quick decreased	G1	unrelated		05.04.2022	ongoing	no	
+ezu529	Dermatitis	G2	related	Cemiplimab	04.07.2023	11.07.2023	no	
+ezu529	Dermatitis	G1	related	Cemiplimab	12.07.2023	ongoing	no	
+Icf063	Diarrhea	G1	possibly related		21.01.2023	16.01.2023	no	
+yza258	Diarrhea	G2	possibly related	Cemiplimab	14.04.2024	19.04.2024	no	
+sai395	Diarrhea	G1	possibly related	Cemiplimab	25.05.2021	12.06.2021	no	
+myj913	Diarrhea	G2	related	Sonidegib	20.03.2021	22.04.2021	no	
+wky208	Diarrhea	G1	possibly related		25.06.2022	25.08.2022	no	
+ptw592	Dizziness due to vasovagal reaction 	G1	unrelated		09.11.2023	09.11.2023	no	
+hja417	Dysgeusia	G1	related	Sonidegib	12.07.2021	05.10.2021	no	
+sai395	Dysgeusia	G1	possibly related	Sonidegib	27.05.2021	12.06.2021	no	
+ooc047	Dysgeusia	G1	related	Sonidegib	10.06.2024	ongoing	no	
+ruk146	Dysgeusia	G1	related	Sonidegib	07.02.2024	ongoing	no	
+ptw592	Dysgeusia	G1	related	Sonidegib	21.11.2023	ongoing	no	
+ eth049	Dysgeusia	G1	related	Sonidegib	16.01.2024	ongoing	no	
+wky208	Dysgeusia	G1	possibly related	Sonidegib	20.05.2022	ongoing	no	
+wky208	Dyslipidaemia	G1	unrelated		19.10.2022	ongoing	no	
+ptw592	Eosinophile count increased	G3	possibly related	Cemiplimab	19.12.2023	08.01.2024	no	
+ptw592	Eosinophile count increased	G1	possibly related	Cemiplimab	09.01.2024	03.06.2024	no	
+ eth049	Eosinophile count increased	G1	possibly related	Cemiplimab	14.11.2023	05.02.2024	no	
+rhx975	Erythema 	G1	possibly related	Cemiplimab	07.07.2022	08.07.2022	no	
+yza258	Fatigue	G1	possibly related		21.11.2023	ongoing	no	
+ooc047	Fatigue	G1	related	Sonidegib	10.04.2024	24.04.2024	no	
+igs319	Fatigue	G1	related		20.10.2021	ongoing	no	
+lkw727	Fatigue	G1	possibly related		13.12.2021	ongoing	no	
+sai395	Fatigue	G1	related	Sonidegib	28.02.2021	06.10.2021	no	
+wky208	Fatigue	G2	possibly related		25.08.2022	ongoing	no	
+ruk146	Fever	G1	unrelated		07.02.2024	10.02.2024	no	
+olj603	GGT increased	G1	possibly related	Cemiplimab	03.05.2022	10.05.2022	no	
+olj603	GGT increased	G1	possibly related	Cemiplimab	24.05.2022	05.07.2022	no	
+sai395	GGT increased	G1	possibly related	Cemiplimab	09.09.2021	13.09.2021	no	
+sai395	GGT increased	G3	possibly related	Cemiplimab	14.09.2021	22.09.2021	no	
+sai395	GGT increased	G2	possibly related	Cemiplimab	23.09.2021	Ongoing	no	
+igs319	GGT increased	G1	unrelated		05.04.2022	19.04.2022	no	
+rhx975	GGT increased 	G1	possibly related	Cemiplimab	01.03.2022	ongoing	no	
+rhx975	Alopecia	G1	possibly related	Sonidegib	08.03.2022	29.03.2022	no	
+ptw592	Headache	G1	possibly related	Sonidegib	25.10.2023	ongoing	no	
+ezu529	Hyperactive delirium	G3	unrelated		07.08.2023	ongoing	no	
+myj913	Hyperkalemia	G1	unrelated		15.06.2021	21.06.2021	no	
+ eth049	Hyperkalemia	G1	possibly related		24.10.2023	ongoing	no	
+yza258	Hyperthyroidism	G1	related	Cemiplimab	28.12.2023	26.02.2024	no	
+rqb506	Hyperthyroidism	G1	related	Cemiplimab	04.05.2021	31.05.2021	no	
+ eth049	Hypoalbuminemia	G1	related	Cemiplimab	17.10.2023	ongoing	no	
+olj603	Hypocalcemia	G1	unrelated		03.05.2022	10.05.2022	no	
+kso395	Hypocortisonism	G2	possibly related	Cemiplimab	26.04.2024	ongoing	no	
+wky208	Hypokalemia	G1	unrelated		04.10.2022	14.10.2022	no	
+myj913	Hyponatriemia	G2	unrelated		01.07.2021	ongoing	no	
+Icf063	Hypophosphatemia	G2	possibly related		27.09.2022	08.11.2022	no	
+Icf063	Hypophosphatemia	G1	unrelated		16.05.2025	ongoing	no	
+lkw727	Hypophosphatemia	G2	unrelated		27.12.2022	26.04.2022	no	
+ eth049	Hypophosphatemia	G1	related	Sonidegib	27.12.2023	05.02.2024	no	
+myj913	Hypophosphatemia	G2	related	Sonidegib	23.03.2021	22.04.2021	no	
+ptw592	Hypophosphatemia 	G1	possibly related	Sonidegib	21.11.2023	ongoing	no	
+yza258	Hypothyroidism	G2	related	Cemiplimab	09.04.2024	ongoing	no	
+rqb506	Hypothyroidism	G2	related	Cemiplimab	01.06.2021	ongoing	no	
+kso395	Hypothyroidism	G1	possibly related	Cemiplimab	14.03.2024	ongoing	no	
+kso395	Hypothyroidism	G2	possibly related	Cemiplimab	26.04.2024	ongoing	no	
+ eth049	Hypothyroidism	G2	related	Cemiplimab	14.11.2023	ongoing	no	
+Icf063	C-reactive protein increased	G1	related		02.05.2023	16.05.2023	no	
+ezu529	Eosinophile count increased	G1	possibly related	Cemiplimab	27.06.2023	11.07.2023	no	
+igs319	INR increased	G1	unrelated		05.04.2022	ongoing	no	
+ezu529	INR increased	G3	unrelated		13.08.2023	23.08.2023	no	
+ooc047	Lactate dehydrogenase increased	G1	unrelated		14.05.2024	01.07.2024	no	
+rqb506	Lactate dehydrogenase increased	G1	possibly related		03.08.2021	05.10.2021	no	
+olj603	Lactate dehydrogenase increased	G1	possibly related	Sonidegib	26.07.2022	16.08.2022	no	
+lkw727	Lactate dehydrogenase increased	G1	possibly related		11.11.2021	21.12.2021	no	
+lkw727	Lactate dehydrogenase increased	G4	possibly related		15.03.2022	29.03.2022	no	
+ eth049	Lactate dehydrogenase increased	G1	related	Cemiplimab	06.02.2024	17.03.2024	no	
+mce555	Lactate dehydrogenase increased	G1	possibly related		19.08.2021	07.10.2021	no	
+rhx975	Lactate dehydrogenase increased	G1	possibly related	Sonidegib	29.03.2022	28.04.2022	no	
+wky208	Lactate increased	G1	unrelated		11.10.2022	11.10.2022	no	
+ezu529	Lymphycyte count increased	G2	possibly related		12.07.2023	ongoing	no	
+mce555	Myoglobin increased	G1	possibly related		30.12.2021	ongoing	no	
+yza258	Neutrophil count increased	G1	possibly related		06.02.2024	12.02.2024	no	
+ eth049	Increased NT-pro BNP	G1	unrelated		27.02.2024		no	
+Icf063	Pancreatic amylase increased	G1	related		17.01.2023	07.02.2023	no	
+Icf063	Pancreatic amylase increased	G2	related		28.01.2023	06.03.2023	no	
+Icf063	Pancreatic amylase increased	G3	related		07.03.2023	13.03.2023	no	
+Icf063	Pancreatic amylase increased	G2	related		14.03.2023	16.05.2023	no	
+yza258	Pancreatic amylase increased	G1	possibly related		19.12.2023		no	
+ezu529	Pancreatic amylase increased	G1	possibly related	Sonidegib	13.06.2023	26.06.2023	no	
+ezu529	Pancreatic amylase increased	G2	possibly related		27.06.2023	03.07.2023	no	
+ezu529	Pancreatic amylase increased	G1	possibly related		04.07.2023	ongoing	no	
+ptw592	Pancreatic amylase increased	G2	related		30.01.2024	19.02.2024	no	
+qqe208	Pancreatic amylase increased	G1	related	Sonidegib	19.07.2023	03.08.2023	no	
+qqe208	Pancreatic amylase increased	G1	related	Sonidegib	10.08.2023	ongoing	no	
+Icf063	Troponin I increased	G1	possibly related		08.11.2022	10.11.2022	no	
+ezu529	Troponin I increased	G1	possibly related	Cemiplimab	27.06.2023	01.10.2023	no	
+ eth049	Troponin T increased	G1	unrelated		27.02.2024		no	
+mce555	Troponin T increased	G1	possibly related		18.11.2021	ongoing	no	
+ezu529	TSH increased	G1	possibly related	Cemiplimab	27.06.2023	03.07.2023	no	
+ezu529	TSH increased	G1	possibly related	Cemiplimab	02.10.2023	ongoing	no	
+lkw727	TSH increased	G1	possibly related		15.03.2022	29.03.2022	no	
+ eth049	Urea increased	G1	possibly related		18.03.2024	ongoing	no	
+lkw727	Urea increased	G1	possibly related		15.03.2022	26.04.2022	no	
+kso395	Myalgia	G1	related	Cemiplimab	23.09.2023	24.09.2023	no	
+yza258	Muscle cramps	G2	related	Sonidegib	23.03.2024	ongoing	no	
+ooc047	Muscle cramps	G1	related	Sonidegib	20.04.2024	ongoing	no	
+ooc047	Nausea	G1	related	Sonidegib	10.04.2024	ongoing	no	
+kso395	Pruritus	G1	related		06.10.2023	05.02.2024	no	
+ooc047	Headache	G1	related	Sonidegib	10.04.2024	ongoing	no	
+ooc047	Isolated Uveitis anterior	G2	related	Cemiplimab	29.09.2024	05.11.2024	no	
+yza258	Leukocyte count increased	G1	possibly related		06.02.2024	12.02.2024	no	
+ eth049	Leukocyte count increased	G1	possibly related	Cemiplimab	14.11.2023	ongoing	no	
+rhx975	Lichenoid dermatitis	G2	related	Cemiplimab	23.08.2022	ongoing	no	
+wky208	Loss of appetite	G1	possibly related	Sonidegib	10.05.2022	24.05.2022	no	
+igs319	Muscle cramps	G1	possibly related		25.01.2022	08.03.2022	no	
+hja417	Muscle cramps	G1	related	Sonidegib	15.05.2021	21.09.2021	no	
+ptw592	Muscle cramps	G1	related	Sonidegib	11.04.2024	24.04.2024	no	
+olj603	Muscle cramps	G1	possibly related	Sonidegib	05.07.2022	26.07.2022	no	
+lkw727	Muscle cramps	G1	possibly related	Sonidegib	28.10.2021	01.02.2022	no	
+sai395	Muscle cramps	G1	related	Sonidegib	27.02.2021	11.05.2021	no	
+myj913	Muscle cramps	G1	possibly related	Sonidegib	27.06.2021	ongoing	no	
+wky208	Muscle cramps	G1	possibly related	Sonidegib	08.05.2022	ongoing	no	
+mce555	Muscle cramps	G1	possibly related	Sonidegib	13.10.2021	ongoing	no	
+rhx975	Muscle cramps	G1	possibly related	Sonidegib	29.03.2022	28.04.2022	no	
+rhx975	Muscle cramps	G1	possibly related	Sonidegib	31.05.2022	04.08.2022	no	
+wky208	Myalgia	G1	possibly related		04.08.2022	25.08.2022	no	
+myj913	Myalgia	G1	possibly related	Cemiplimab	24.04.2021	28.05.2021	no	
+myj913	Myalgia	G2	possibly related	Cemiplimab	29.05.2021	ongoing	no	
+yza258	Nausea	G1	unrelated		14.04.2024	ongoing	no	
+sai395	Nausea	G1	related	Sonidegib	27.02.2021	09.03.2021	no	
+sai395	Nausea	G1	related	Sonidegib	25.05.2021	02.07.2021	no	
+ eth049	Nausea	G2	unrelated		27.02.2024		no	
+ezu529	Non ersosive gastritis 	G2	unrelated		17.08.2023	ongoing	no	
+wky208	Occular dryness	G1	possibly related		12.10.2022	14.10.2022	no	
+rqb506	Phototoxic reaction	G1	possibly related	Cemiplimab	09.05.2021	14.06.2021	no	
+rqb506	Phototoxic reaction	G2	possibly related	Cemiplimab	15.06.2021	13.09.2021	no	
+rqb506	Phototoxic reaction	G1	possibly related	Cemiplimab	14.09.2021	ongoing	no	
+yza258	Platelete count increased	G1	unrelated		06.02.2024	18.03.2024	no	
+igs319	Platelete count increased	G1	unrelated		05.04.2022	19.04.2022	no	
+igs319	Pneumonia	G3	unrelated		18.03.2022	26.03.2022	yes	
+wky208	Polymyalgia rheumatica	G3	related	Cemiplimab	03.10.2022	11.10.2022	yes	
+wky208	Polymyalgia rheumatica	G2	possibly related	Cemiplimab	25.08.2022	03.10.2022	no	
+wky208	Polymyalgia rheumatica	G3	possibly related	Cemiplimab	03.10.2022	15.11.2022	no	
+rqb506	Pruritus	G1	possibly related	Cemiplimab	07.05.2021	ongoing	no	
+hja417	Pruritus	G1	possibly related	Cemiplimab	08.04.2021	29.04.2021	no	
+ptw592	Pruritus	G1	related		08.12.2023	ongoing	no	
+sai395	Pruritus	G1	possibly related	Cemiplimab	17.03.2021	24.05.2021	no	
+sai395	Pruritus	G2	possibly related	Cemiplimab	25.05.2021	06.06.2021	no	
+sai395	Pruritus	G2	possibly related	Cemiplimab	08.08.2021	09.09.2021	no	
+sai395	Pruritus 	G1	possibly related	Cemiplimab	06.06.2021	07.08.2021	no	
+wky208	Pruritus 	G1	unrelated		14.07.2022	ongoing	no	
+wky208	Pyelonephritis	G2	possibly related	Cemiplimab	06.10.2022	18.10.2022	no	
+ruk146	Rhinitis infective	G1	unrelated		14.02.2024	23.02.2024	no	
+ezu529	Sepsis with staph. Aureus	G4	unrelated		11.08.2023	23.08.2023	no	
+sai395	Skin and subcutaneuous tissue disorder	G1	possibly related	Cemiplimab	17.03.2021	24.05.2021	no	
+sai395	Skin and subcutaneuous tissue disorder	G2	possibly related	Cemiplimab	25.05.2021	05.06.2021	no	
+sai395	Skin and subcutaneuous tissue disorder	G1	possibly related	Cemiplimab	06.06.2021	07.08.2021	no	
+sai395	Skin and subcutaneuous tissue disorder	G2	possibly related	Cemiplimab	08.08.2021	09.09.2021	no	
+igs319	Skin disorder	G1	possibly related		05.11.2021	08.11.2021	no	
+lkw727	Skin disorder	G1	possibly related	Sonidegib	04.11.2021	30.11.2021	no	
+lkw727	Skin disorder	G2	possibly related		01.02.2022	29.03.2022	no	
+olj603	Skin reaction after consumption of eggs	G1	unrelated		19.07.2022	19.07.2022	no	
+ruk146	Sore throat	G1	unrelated		07.02.2024	23.02.2024	no	
+wky208	Tongue burn	G1	possibly related	Sonidegib	20.05.2022	ongoing	no	
+wky208	Transaminase increased	G1	unrelated		10.10.2022	25.10.2022	no	
+ooc047	Urea increased	G1	possibly related		06.08.2024	ongoing	no	
+myj913	Vasculitis	G2	possibly related	Cemiplimab	24.06.2021	ongoing	no	
+myj913	Vasovagal reaction 	G3	unrelated		04.09.2021	04.09.2021	no	
+wky208	Vasovagal syncope 	G1	unrelated		11.10.2022	11.10.2022	no	
+Icf063	Vitamin D deficiency	G1	unrelated		27.09.2022	08.10.2022	no	
+mce555	Vitamin D deficiency	G1	unrelated		04.01.2022	ongoing	no	
+ eth049	Weight loss	G1	related	Sonidegib	16.01.2024	ongoing	no	
+myj913	Weight loss	G1	possibly related	Sonidegib	25.05.2021	ongoing	no	
+hja417	Wound infection 	G2	unrelated		12.08.2021	10.09.2021	no	
+sai395	Wound infection 	G1	possibly related	Cemiplimab	25.03.2021	03.06.2021	no	
+wky208	Xerostomie	G1	possibly related		24.10.2022	onging	no	

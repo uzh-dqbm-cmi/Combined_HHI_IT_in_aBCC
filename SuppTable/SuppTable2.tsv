@@ -1,0 +1,9 @@
+Patient ID	Prior HHI 	Best response to prior HHI	Reason for discontinuation of prior HHI	Washout duration before study entry	Duration of Vismodegib	Duration of Sonideib 
+Pat1	Vismodegib	Partial response 	Progressive disease 	131	46	NA
+Pat2	Vismodegib	Progressive disease	Progressive disease 	11	76	NA
+Pat3	Vismodegib	Progressive disease 	New Diagnosis of B Cell Lymphoma 	41	52	NA
+Pat4	Vismodegib/Sonidegib	Progressive disease 	Progressive disease 	5	39	30
+Pat5	Vismodegib/ Sonidegib	Partial response	Progressive disease 	6	24	27
+Pat8	Vismodegib/Sonidegib	Complete response	Recurrence 	28	54	60
+Pat18	Vismodegib/Sonidegib	Progressive disease	Progressive disease 	5	164	133
+Pat20	Vismodegib/Sonidegib	Complete Response 	Recurrence	33	181	12
