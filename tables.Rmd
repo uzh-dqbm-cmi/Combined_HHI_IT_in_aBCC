@@ -1,0 +1,497 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+
+library(openxlsx)
+library(tidyverse)
+library(gt)
+library(dplyr)
+library(tidyr)
+data <- read.xlsx("Kopie von Patient_characteristics3.xlsx", 
+                  sheet = "Adverse Events") %>%
+  mutate(Relatedness = str_remove(Relatedness, " $")) # remove trailing spaces
+
+```
+
+
+All patients with any AE (all grades):
+
+```{r}
+
+data %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+All patients with any AE (grade 3 to 5):
+
+```{r}
+
+data %>%
+  filter(Grade %in% c("G3", "G4", "G5")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+Treatment related (all grades)
+
+```{r}
+
+data %>%
+  filter(Relatedness %in% c("related", "possibly related")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+Treatment related (grades 3 to 5)
+
+```{r}
+
+data %>%
+  filter(Relatedness %in% c("related", "possibly related")) %>%
+  filter(Grade %in% c("G3", "G4", "G5")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+Frequency of individual AEs:
+```{r}
+
+# any grade
+ae_freq_all <- data %>% 
+  select(patient, Adverse.Events) %>%
+  unique() %>%
+  group_by(Adverse.Events) %>%
+  summarise(all_grades = length(unique(patient))) %>% 
+  arrange(desc(all_grades))
+
+# grades 1 to 2
+ae_freq_mild <- data %>%
+  filter(Grade %in% c("G1", "G2")) %>%
+  select(patient, Adverse.Events) %>%
+  unique() %>%
+  group_by(Adverse.Events) %>%
+  summarise(g12 = length(unique(patient))) %>% 
+  arrange(desc(g12))
+
+# grades 3 to 5
+ae_freq_severe <- data %>%
+  filter(Grade %in% c("G3", "G4", "G5")) %>%
+  select(patient, Adverse.Events) %>%
+  unique() %>%
+  group_by(Adverse.Events) %>%
+  summarise(g35 = length(unique(patient))) %>% 
+  arrange(desc(g35))
+
+# Combine above in one data.frame
+ae_freqs_together <- merge(ae_freq_all, ae_freq_mild, by = 1, all = TRUE) %>% merge(., ae_freq_severe, by = 1, all = T) %>% arrange(desc(all_grades))
+
+# Save as xlsx
+write.xlsx(ae_freqs_together, "AE_frequencies.xlsx")
+
+```
+
+```{r}
+# Define total patient set from your data if needed
+total_patients <- length(unique(data$patient))  # optional
+
+# Base data: add grade_group
+data <- data %>%
+  mutate(
+    grade_group = case_when(
+      Grade %in% c("G1", "G2") ~ "g12",
+      Grade %in% c("G3", "G4", "G5") ~ "g35",
+      TRUE ~ NA_character_
+    )
+  )
+
+# Create three labeled subsets
+# Create grouped datasets
+all_ae <- data %>%
+  filter(!is.na(grade_group)) %>%
+  mutate(group = "All Adverse Events")
+
+related_ae <- data %>%
+  filter(!is.na(grade_group), Relatedness == "related") %>%
+  mutate(group = "Treatment-related")
+
+#possibly_related_ae <- data %>%
+#  filter(!is.na(grade_group), Relatedness %in% c("related", "possibly related")) %>%
+#  mutate(group = "Treatment-related or possibly related")
+
+# Combine all rows
+summary_data <- bind_rows(all_ae, 
+                          related_ae, 
+                          #possibly_related_ae
+                          )
+
+# g12 and g35: per patient, per group, per grade_group
+g12_g35_counts <- summary_data %>%
+  distinct(patient, group, grade_group) %>%
+  count(group, grade_group, name = "n") %>%
+  pivot_wider(names_from = grade_group, values_from = n, values_fill = 0)
+
+# all_grades: per patient per group (regardless of grade group)
+all_grades_counts <- summary_data %>%
+  distinct(patient, group) %>%
+  count(group, name = "all_grades")
+
+# Join them cleanly
+summary_rows <- full_join(all_grades_counts, g12_g35_counts, by = "group") %>%
+  replace_na(list(g12 = 0, g35 = 0)) %>%
+  rename(Adverse.Events = group) %>%
+  select(Adverse.Events, all_grades, g12, g35)
+```
+
+```{r}
+# Copy the original dataframe
+ae_table <- rbind(summary_rows, ae_freqs_together)
+
+# Helper function to format numbers with percentage, or "-" for NAs
+format_with_percent <- function(x) {
+  if (is.na(x)) {
+    return("-")
+  } else {
+    return(sprintf("%d (%.0f%%)", x, 100 * x / total_patients))
+  }
+}
+
+# Apply formatting column-wise
+ae_table$all_grades <- sapply(ae_table$all_grades, format_with_percent)
+ae_table$g12        <- sapply(ae_table$g12,        format_with_percent)
+ae_table$g35        <- sapply(ae_table$g35,        format_with_percent)
+
+# Create the gt table
+gt_table <- ae_table %>%
+  gt() |>
+  opt_stylize(style = 1, , color = "gray") %>%
+  cols_label(
+    Adverse.Events = "Adverse Events",
+    all_grades     = "All Grades",
+    g12            = "Grade 1-2",
+    g35            = "Grade 3-5"
+  ) %>%
+  cols_align(
+    align = "center",
+    columns = c(all_grades, g12, g35)  # target all but first column
+  )
+
+# Show the table
+gt_table
+```
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+gtsave(gt_table, "ae_table_13-08-26.pdf")
+```
+
+
+```{r}
+```
+
+Cemi realted, all grades
+
+```{r}
+
+data %>%
+  filter(Medication_related == "Cemiplimab") %>%
+  filter(Grade %in% c("G3", "G4", "G5")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+Cemi realted, grades 3 to 5
+
+```{r}
+
+data %>%
+  filter(Medication_related == "Cemiplimab") %>%
+  filter(Grade %in% c("G3", "G4", "G5")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+Soni related, all grades 
+
+```{r}
+
+data %>%
+  filter(Medication_related == "Sonidegib") %>%
+#  filter(X3 %in% c("G3", "G4", "G5")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+Soni related, grades 3 to 5
+
+```{r}
+
+data %>%
+  filter(Medication_related == "Sonidegib") %>%
+  filter(Grade %in% c("G3", "G4", "G5")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+```
+
+Related to both, all grades
+(I understand this to mean that a patient has an AE related to Cemi, and 
+also an AE related to Soni. They don't have to be the same AE.)
+
+```{r}
+
+data %>%
+  filter(!is.na(Medication_related)) %>%
+  select(patient, Medication_related) %>%
+  unique() %>%
+  group_by(patient) %>%
+  summarise(num_drugs = length(unique(Medication_related))) %>%
+  filter(num_drugs == 2) %>%
+  nrow()
+
+
+```
+
+
+Related to both, grades 3 to 5
+
+```{r}
+
+data %>%
+  filter(!is.na(Medication_related)) %>%
+  filter(Grade %in% c("G3", "G4", "G5")) %>%
+  select(patient, Medication_related) %>%
+  unique() %>%
+  group_by(patient) %>%
+  summarise(num_drugs = length(unique(Medication_related))) %>%
+  filter(num_drugs == 2) %>%
+  nrow()
+
+
+```
+
+Unknown which drug, all grades 
+(Here is "related" or "possibly related" but NA in Medication_related)
+
+```{r}
+
+data %>%
+  filter(is.na(Medication_related)) %>%
+  filter(Relatedness %in% c("related", "possibly related")) %>%
+#  filter(X3 %in% c("G3", "G4", "G5"))
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+
+```
+
+Unknown which drug, grades 3 to 5
+(Here is "related" or "possibly related" but NA in Medication_related)
+
+```{r}
+
+data %>%
+  filter(is.na(Medication_related)) %>%
+  filter(Relatedness %in% c("related", "possibly related")) %>%
+  filter(X3 %in% c("G3", "G4", "G5")) %>%
+  select(patient) %>%
+  unique() %>%
+  nrow()
+
+
+```
+Response summary table
+```{r}
+summarydata <- read.delim("summary.tsv",
+                     header = TRUE, sep = "\t")
+
+```
+
+```{r}
+sum_table <- summarydata %>%
+  gt() |>
+  opt_stylize(style = 1, , color = "gray") %>%
+  cols_label(
+    Response.type = "Response Type",
+    Number.of.Patients = "Number of Patients",
+    Proportion = "Proportion (%)") %>%
+    tab_header(
+    title = md("Best response any time between treatment start and week 26"),
+    subtitle = md("Patients (n=20)"))
+
+sum_table
+```
+
+```{r}
+gtsave(sum_table, "summary_table.pdf")
+```
+
+Supp Table 1
+```{r}
+supp1 <- read.delim("SuppTable/SuppTable1.tsv",
+                     header = TRUE, sep = "\t")
+colnames(supp1)
+```
+
+```{r}
+supp1_table <- supp1 %>%
+  gt() |>
+  opt_stylize(style = 1, , color = "gray") %>%
+  cols_label(
+    Patient.ID = "ID",
+    Sex = "Sex",
+    Age = "Age (years)",
+    Comorbidities = "Hematological malignancies and genetic diseases",
+    Tumor.Stage = "Tumor Stage",
+    prior.local.therapy = "Prior Local Therapy",
+    prior.systemic.therapy = "Prior Systemic Therapy"
+    ) |>
+  tab_options(
+    page.orientation = "landscape",
+    page.width = "11.7in",
+    page.height = "8.3in",
+    table.font.size = px(10)
+  )|> tab_header(
+    title = md("Supplementary Table 1"),
+    subtitle = md("Patient characteristics, including hematological malignancies and genetic diseases, local and systemic treatments.")
+  ) |> opt_align_table_header(align = "left")
+
+supp1_table
+```
+
+```{r}
+gtsave(supp1_table, "supp1_table.pdf")
+```
+Supp Table 2
+```{r}
+supp2 <- read.delim("SuppTable/SuppTable2.tsv",
+                     header = TRUE, sep = "\t")
+colnames(supp2)
+```
+
+```{r}
+supp2_table <- supp2 %>%
+  gt() |>
+  opt_stylize(style = 1, , color = "gray") %>%
+  cols_label(
+    Patient.ID = "ID",
+    Prior.HHI. = "Prior HHI",
+    Best.response.to.prior.HHI = "Best response to prior HHI",
+    Reason.for.discontinuation.of.prior.HHI = "Reason for discontinuation of prior HHI",
+    Washout.duration.before.study.entry = "Washout duration before study entry (weeks)",
+    Duration.of.Vismodegib = "Duration of vismodegib (weeks)",
+    Duration.of.Sonideib. = "Duration of Sonidegib (weeks)"
+    ) |>
+  tab_options(
+    page.orientation = "landscape",
+    page.width = "11.7in",
+    page.height = "8.3in",
+    table.font.size = px(10)
+  )|> tab_header(
+    title = md("Supplementary Table 2"),
+    subtitle = md("Data on prior HHI treatment.")
+  ) |> opt_align_table_header(align = "left")
+
+supp2_table
+```
+
+```{r}
+gtsave(supp2_table, "supp2_table.pdf")
+```
+
+
+```{r}
+supp3 <- read.delim("SuppTable/SuppTable3.tsv",
+                     header = TRUE, sep = "\t")
+colnames(supp3)
+```
+
+```{r}
+supp3_table <- supp3 %>%
+  gt() |>
+  opt_stylize(style = 1, , color = "gray") %>%
+  cols_label(
+    ID = "ID",
+    Response.at.week.26 = "Response at week.26",
+    Best.response.anytime.between.treatment.start.and.week.26 = "Best response anytime between treatment start and week 26"
+) |>
+  tab_options(
+    page.orientation = "landscape",
+    page.width = "11.7in",
+    page.height = "8.3in",
+    table.font.size = px(10)
+  )|> tab_header(
+    title = md("Supplementary Table 3"),
+    subtitle = md("Responses at week 26 and best response by week 26.")
+  ) |> opt_align_table_header(align = "left")
+
+supp3_table
+```
+
+```{r}
+gtsave(supp3_table, "supp3_table.pdf")
+```
+
+```{r}
+supp4 <- read.delim("SuppTable/SuppTable4.tsv",
+                     header = TRUE, sep = "\t")
+colnames(supp4)
+```
+
+```{r}
+supp4_table <- supp4 %>%
+  gt() |>
+  opt_stylize(style = 1, , color = "gray") %>%
+  cols_label(
+    Pat.ID = "ID",
+    Cemiplimab.cycles.received = "Cemiplimab cycles received",
+    Sonidegib.cycles.received = "Sonidegib cycles received",
+    Completed.26.Wk.regimen. = "Completed 26wk regimen",
+    Dose.interruption = "Dose interruption (Drug/reason)",
+    Reason.for.early.study.discontinuation = "Reason for early study discontinuation",
+    Dose.Reduction = "Dose Reduction",
+    Post.26.week.Status...Treatment = "Post 26wk Status / Treatment"
+    ) |>
+  tab_options(
+    page.orientation = "landscape",
+    page.width = "11.7in",
+    page.height = "8.3in",
+    table.font.size = px(10)
+  )|> tab_header(
+    title = md("Supplementary Table 4"),
+    subtitle = md("Dose intensity, interruptions, reductions and post study status")
+  ) |> opt_align_table_header(align = "left")
+
+supp4_table
+```
+
+```{r}
+gtsave(supp4_table, "supp4_table.pdf")
+```
+
